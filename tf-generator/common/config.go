@@ -7,24 +7,16 @@ type Config struct {
 	DuploToken         string
 	TenantId           string
 	TenantName         string
-	CertArn            string
 	CustomerName       string
 	AdminTenantDir     string
-	AwsServicesDir     string
-	AppDir             string
 	AwsProviderVersion string
 	TenantProject      string
-	AwsServicesProject string
-	AppProject         string
 	GenerateTfState    bool
 	S3Backend          bool
 	ValidateTf         bool
 	AccountID          string
 	TFCodePath         string
 	TFVersion          string
-	SkipAdminTenant    bool
-	SkipAwsServices    bool
-	SkipApp            bool
 	AwsRegion          string
 	AwsClientConfig    aws.Config
 }

@@ -41,13 +41,6 @@ func (envVar *EnvVarValidator) Validate() (*Config, error) {
 		return nil, err
 	}
 
-	certArn := os.Getenv("cert_arn")
-	if len(certArn) == 0 {
-		err := fmt.Errorf("error - please provide \"%s\" as env variable", "cert_arn")
-		log.Printf("[TRACE] - %s", err)
-		return nil, err
-	}
-
 	awsProviderVersion := os.Getenv("aws_provider_version")
 	if len(awsProviderVersion) == 0 {
 		awsProviderVersion = "4.30.0"
@@ -61,16 +54,6 @@ func (envVar *EnvVarValidator) Validate() (*Config, error) {
 	tenantProject := os.Getenv("tenant_project")
 	if len(tenantProject) == 0 {
 		tenantProject = "admin-tenant"
-	}
-
-	awsServicesProject := os.Getenv("aws_services_project")
-	if len(awsServicesProject) == 0 {
-		awsServicesProject = "aws-services"
-	}
-
-	appProject := os.Getenv("app_project")
-	if len(appProject) == 0 {
-		appProject = "app"
 	}
 
 	generateTfState := false
@@ -110,30 +93,6 @@ func (envVar *EnvVarValidator) Validate() (*Config, error) {
 		s3Backend = s3BackendBool
 	}
 
-	skipTenant := false
-	skipTenantStr := os.Getenv("skip_admin_tenant")
-	if len(skipTenantStr) == 0 {
-		skipTenant = false
-	} else {
-		skipTenant, _ = strconv.ParseBool(skipTenantStr)
-	}
-
-	skipAwsServices := false
-	skipAwsServicesStr := os.Getenv("skip_aws_services")
-	if len(skipAwsServicesStr) == 0 {
-		skipAwsServices = false
-	} else {
-		skipAwsServices, _ = strconv.ParseBool(skipAwsServicesStr)
-	}
-
-	skipApp := false
-	skipAppStr := os.Getenv("skip_app")
-	if len(skipAppStr) == 0 {
-		skipApp = false
-	} else {
-		skipApp, _ = strconv.ParseBool(skipAppStr)
-	}
-
 	return &Config{
 		DuploHost:          host,
 		DuploToken:         token,
@@ -141,15 +100,9 @@ func (envVar *EnvVarValidator) Validate() (*Config, error) {
 		CustomerName:       custName,
 		AwsProviderVersion: awsProviderVersion,
 		TenantProject:      tenantProject,
-		AwsServicesProject: awsServicesProject,
-		AppProject:         appProject,
 		GenerateTfState:    generateTfState,
 		S3Backend:          s3Backend,
-		CertArn:            certArn,
 		ValidateTf:         validateTf,
 		TFVersion:          tfVersion,
-		SkipAdminTenant:    skipTenant,
-		SkipAwsServices:    skipAwsServices,
-		SkipApp:            skipApp,
 	}, nil
 }

@@ -1,4 +1,4 @@
-package app
+package tenant
 
 import (
 	"fmt"
@@ -12,16 +12,16 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-type AppBackend struct {
+type TenantBackend struct {
 }
 
-func (ab *AppBackend) Generate(config *common.Config, client *duplosdk.Client) (*common.TFContext, error) {
-	log.Println("[TRACE] <====== App backend TF generation started. =====>")
+func (tb *TenantBackend) Generate(config *common.Config, client *duplosdk.Client) (*common.TFContext, error) {
+	log.Println("[TRACE] <====== AWS Services backend TF generation started. =====>")
 	// create new empty hcl file object
 	hclFile := hclwrite.NewEmptyFile()
 
 	// create new file on system
-	path := filepath.Join(config.TFCodePath, config.AppProject, "backend.tf")
+	path := filepath.Join(config.TFCodePath, config.TenantProject, "backend.tf")
 	tfFile, err := os.Create(path)
 	if err != nil {
 		fmt.Println(err)
@@ -42,7 +42,7 @@ func (ab *AppBackend) Generate(config *common.Config, client *duplosdk.Client) (
 	s3BackendBody.SetAttributeValue("region",
 		cty.StringVal("us-west-2")) // TODO - Take region from ENV VAR
 	s3BackendBody.SetAttributeValue("key",
-		cty.StringVal(config.AppProject))
+		cty.StringVal(config.TenantProject))
 
 	s3BackendBody.SetAttributeValue("workspace_key_prefix",
 		cty.StringVal("tenant:"))
@@ -55,6 +55,6 @@ func (ab *AppBackend) Generate(config *common.Config, client *duplosdk.Client) (
 		fmt.Println(err)
 		return nil, err
 	}
-	log.Println("[TRACE] <====== App Services backend TF generation done. =====>")
+	log.Println("[TRACE] <====== AWS Services backend TF generation done. =====>")
 	return nil, nil
 }

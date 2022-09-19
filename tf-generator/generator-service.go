@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"tenant-native-terraform-generator/duplosdk"
-	"tenant-native-terraform-generator/tf-generator/app"
-	awsservices "tenant-native-terraform-generator/tf-generator/aws-services"
 	"tenant-native-terraform-generator/tf-generator/common"
 	"tenant-native-terraform-generator/tf-generator/tenant"
 )
@@ -40,50 +38,6 @@ func (tfg *TfGeneratorService) PreProcess(config *common.Config, client *duplosd
 	}
 	config.AdminTenantDir = tenantProject
 
-	awsServicesProject := filepath.Join(config.TFCodePath, config.AwsServicesProject)
-	err = os.RemoveAll(awsServicesProject)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = os.MkdirAll(awsServicesProject, os.ModePerm)
-	if err != nil {
-		log.Fatal(err)
-	}
-	config.AwsServicesDir = awsServicesProject
-
-	appProject := filepath.Join(config.TFCodePath, config.AppProject)
-	err = os.RemoveAll(appProject)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = os.MkdirAll(appProject, os.ModePerm)
-	if err != nil {
-		log.Fatal(err)
-	}
-	config.AppDir = appProject
-
-	scriptsPath := filepath.Join("target", config.CustomerName, config.TenantName, "scripts")
-	err = os.RemoveAll(scriptsPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = os.MkdirAll(scriptsPath, os.ModePerm)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = duplosdk.CopyDirectory("./scripts", scriptsPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var mapToRepalce = map[string]string{
-		"<--admin-tenant-->": config.TenantProject,
-		"<--aws-services-->": config.AwsServicesProject,
-		"<--app-->":          config.AppProject,
-	}
-	common.RepalceStringInFile(filepath.Join(scriptsPath, "plan.sh"), mapToRepalce)
-	common.RepalceStringInFile(filepath.Join(scriptsPath, "apply.sh"), mapToRepalce)
-	common.RepalceStringInFile(filepath.Join(scriptsPath, "destroy.sh"), mapToRepalce)
-
 	err = duplosdk.Copy(".gitignore", filepath.Join("target", config.CustomerName, config.TenantName, ".gitignore"))
 	if err != nil {
 		log.Fatal(err)
@@ -114,48 +68,19 @@ func (tfg *TfGeneratorService) StartTFGeneration(config *common.Config, client *
 	// 	tfNewWorkspace(config, tf)
 	// }
 
-	if !config.SkipAdminTenant {
-		log.Println("[TRACE] <====== Start TF generation for tenant project. =====>")
-		// Register New TF generator for Tenant Project
-		tenantGeneratorList := TenantGenerators
-		if config.S3Backend {
-			tenantGeneratorList = append(tenantGeneratorList, &tenant.TenantBackend{})
-		}
-
-		starTFGenerationForProject(config, client, tenantGeneratorList, config.AdminTenantDir)
-		if config.ValidateTf {
-			common.ValidateAndFormatTfCode(config.AdminTenantDir, config.TFVersion)
-		}
-		log.Println("[TRACE] <====== End TF generation for tenant project. =====>")
+	log.Println("[TRACE] <====== Start TF generation for tenant project. =====>")
+	// Register New TF generator for Tenant Project
+	tenantGeneratorList := TenantGenerators
+	if config.S3Backend {
+		tenantGeneratorList = append(tenantGeneratorList, &tenant.TenantBackend{})
 	}
 
-	if !config.SkipAwsServices {
-		log.Println("[TRACE] <====== Start TF generation for aws services project. =====>")
-		// Register New TF generator for AWS Services project
-		awsServcesGeneratorList := AWSServicesGenerators
-		if config.S3Backend {
-			awsServcesGeneratorList = append(awsServcesGeneratorList, &awsservices.AwsServicesBackend{})
-		}
-		starTFGenerationForProject(config, client, awsServcesGeneratorList, config.AwsServicesDir)
-		if config.ValidateTf {
-			common.ValidateAndFormatTfCode(config.AwsServicesDir, config.TFVersion)
-		}
-		log.Println("[TRACE] <====== End TF generation for aws services project. =====>")
+	starTFGenerationForProject(config, client, tenantGeneratorList, config.AdminTenantDir)
+	if config.ValidateTf {
+		common.ValidateAndFormatTfCode(config.AdminTenantDir, config.TFVersion)
 	}
+	log.Println("[TRACE] <====== End TF generation for tenant project. =====>")
 
-	if !config.SkipApp {
-		log.Println("[TRACE] <====== Start TF generation for app project. =====>")
-		// Register New TF generator for App Services project
-		appGeneratorList := AppGenerators
-		if config.S3Backend {
-			appGeneratorList = append(appGeneratorList, &app.AppBackend{})
-		}
-		starTFGenerationForProject(config, client, appGeneratorList, config.AppDir)
-		if config.ValidateTf {
-			common.ValidateAndFormatTfCode(config.AppDir, config.TFVersion)
-		}
-		log.Println("[TRACE] <====== End TF generation for app project. =====>")
-	}
 	return nil
 }
 

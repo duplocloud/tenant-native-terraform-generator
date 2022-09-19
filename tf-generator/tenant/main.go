@@ -1,4 +1,4 @@
-package app
+package tenant
 
 import (
 	"fmt"
@@ -15,13 +15,13 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-type AppMain struct {
+type TenantMain struct {
 }
 
-func (am *AppMain) Generate(config *common.Config, client *duplosdk.Client) (*common.TFContext, error) {
-	workingDir := filepath.Join(config.TFCodePath, config.AppProject)
+func (tm *TenantMain) Generate(config *common.Config, client *duplosdk.Client) (*common.TFContext, error) {
+	workingDir := filepath.Join(config.TFCodePath, config.TenantProject)
 
-	log.Println("[TRACE] <====== App services main TF generation started. =====>")
+	log.Println("[TRACE] <====== AWS services main TF generation started. =====>")
 
 	//1. ==========================================================================================
 	// Generate locals
@@ -92,6 +92,20 @@ func (am *AppMain) Generate(config *common.Config, client *duplosdk.Client) (*co
 		},
 		hcl.TraverseAttr{
 			Name: "tenant.outputs[\"tenant_name\"]",
+		},
+	})
+	rootBody.AppendNewline()
+
+	tenantKmsBlock := rootBody.AppendNewBlock("data",
+		[]string{"duplocloud_tenant_aws_kms_key",
+			"tenant_kms"})
+	tenantKmsBody := tenantKmsBlock.Body()
+	tenantKmsBody.SetAttributeTraversal("tenant_id", hcl.Traversal{
+		hcl.TraverseRoot{
+			Name: "local",
+		},
+		hcl.TraverseAttr{
+			Name: "tenant_id",
 		},
 	})
 	rootBody.AppendNewline()
@@ -178,7 +192,7 @@ func (am *AppMain) Generate(config *common.Config, client *duplosdk.Client) (*co
 	// remoteStateBody.SetAttributeValue("config",
 	// 	cty.ObjectVal(configMap))
 
-	//fmt.Printf("%s", hclFile.Bytes())
+	fmt.Printf("%s", hclFile.Bytes())
 	_, err = tfFile.Write(hclFile.Bytes())
 	if err != nil {
 		fmt.Println(err)
