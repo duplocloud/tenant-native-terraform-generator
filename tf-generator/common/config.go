@@ -13,6 +13,7 @@ type Config struct {
 	TenantProject      string
 	GenerateTfState    bool
 	S3Backend          bool
+	S3Bucket           string
 	ValidateTf         bool
 	AccountID          string
 	TFCodePath         string

@@ -53,7 +53,7 @@ func (envVar *EnvVarValidator) Validate() (*Config, error) {
 
 	tenantProject := os.Getenv("tenant_project")
 	if len(tenantProject) == 0 {
-		tenantProject = "admin-tenant"
+		tenantProject = "tenant"
 	}
 
 	generateTfState := false
@@ -79,10 +79,11 @@ func (envVar *EnvVarValidator) Validate() (*Config, error) {
 		validateTf, _ = strconv.ParseBool(generateTfStateStr)
 	}
 
-	s3Backend := true
+	s3Backend := false
+	s3Bucket := ""
 	s3BackendStr := os.Getenv("s3_backend")
 	if len(s3BackendStr) == 0 {
-		s3Backend = true
+		s3Backend = false
 	} else {
 		s3BackendBool, err := strconv.ParseBool(s3BackendStr)
 		if err != nil {
@@ -91,6 +92,14 @@ func (envVar *EnvVarValidator) Validate() (*Config, error) {
 			return nil, err
 		}
 		s3Backend = s3BackendBool
+		if s3Backend {
+			s3Bucket = os.Getenv("s3_bucket")
+			if len(s3Bucket) == 0 {
+				err := fmt.Errorf("error - Please provide \"%s\" as env variable", "s3_bucket")
+				log.Printf("[TRACE] - %s", err)
+				return nil, err
+			}
+		}
 	}
 
 	return &Config{
@@ -102,6 +111,7 @@ func (envVar *EnvVarValidator) Validate() (*Config, error) {
 		TenantProject:      tenantProject,
 		GenerateTfState:    generateTfState,
 		S3Backend:          s3Backend,
+		S3Bucket:           s3Bucket,
 		ValidateTf:         validateTf,
 		TFVersion:          tfVersion,
 	}, nil

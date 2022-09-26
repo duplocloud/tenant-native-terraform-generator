@@ -64,8 +64,6 @@ func (p *Provider) Generate(config *Config, client *duplosdk.Client) {
 			Name: "region",
 		},
 	})
-	awsProviderBody.AppendNewline()
-
 	fmt.Printf("%s", hclFile.Bytes())
 	_, err = tenantProjectFile.Write(hclFile.Bytes())
 	if err != nil {

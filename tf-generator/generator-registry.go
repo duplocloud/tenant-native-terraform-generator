@@ -4,10 +4,7 @@ import (
 	"tenant-native-terraform-generator/tf-generator/tenant"
 )
 
-var TenantGenerators = []Generator{}
-
-var AWSServicesGenerators = []Generator{
-	&tenant.EC2{},
+var TenantGenerators = []Generator{
+	&tenant.AwsVars{},
+	&tenant.AwsInstance{},
 }
-
-var AppGenerators = []Generator{}
