@@ -34,7 +34,7 @@ const (
 )
 
 const AWS_INSTANCE = "aws_instance"
-const EC2_VAR_PREFIX = "ec2_instance"
+const EC2_VAR_PREFIX = "ec2_instance_"
 const FILE_NAME_PREFIX = "aws-instance-"
 
 type AwsInstance struct {
@@ -236,7 +236,7 @@ func generateEC2InstanceOutputVars(prefix, resourceName string) []common.OutputV
 	}
 	outVarConfigs["private_ip"] = var1
 	var2 := common.OutputVarConfig{
-		Name:          prefix + "aws_instance",
+		Name:          prefix + "public_ip",
 		ActualVal:     "aws_instance." + resourceName + ".public_ip",
 		DescVal:       "The public IP address assigned to the instance.",
 		RootTraversal: true,
