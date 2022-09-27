@@ -37,10 +37,8 @@ func (i *Importer) Import(config *Config, importConfig *ImportConfig) {
 	if err != nil {
 		log.Fatalf("error running NewTerraform: %s", err)
 	}
-	//backend := "-backend-config=bucket=duplo-tfstate-" + config.AccountID + " -backend-config=dynamodb_table=duplo-tfstate-" + config.AccountID + "-lock"
-	//err = tf.Init(context.Background(), tfexec.Upgrade(true), tfexec.BackendConfig("bucket=duplo-tfstate-"+config.AccountID), tfexec.BackendConfig("dynamodb_table=duplo-tfstate-"+config.AccountID+"-lock"))
 	if config.S3Backend {
-		err = tf.Init(context.Background(), tfexec.Upgrade(true), tfexec.BackendConfig("bucket=duplo-tfstate-"+config.AccountID))
+		err = tf.Init(context.Background(), tfexec.Upgrade(true), tfexec.BackendConfig("bucket="+config.S3Bucket))
 	} else {
 		err = tf.Init(context.Background(), tfexec.Upgrade(true))
 	}

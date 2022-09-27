@@ -81,6 +81,7 @@ func (envVar *EnvVarValidator) Validate() (*Config, error) {
 
 	s3Backend := false
 	s3Bucket := ""
+	dynamodbTable := ""
 	s3BackendStr := os.Getenv("s3_backend")
 	if len(s3BackendStr) == 0 {
 		s3Backend = false
@@ -99,6 +100,7 @@ func (envVar *EnvVarValidator) Validate() (*Config, error) {
 				log.Printf("[TRACE] - %s", err)
 				return nil, err
 			}
+			dynamodbTable = os.Getenv("dynamodb_table")
 		}
 	}
 
@@ -112,6 +114,7 @@ func (envVar *EnvVarValidator) Validate() (*Config, error) {
 		GenerateTfState:    generateTfState,
 		S3Backend:          s3Backend,
 		S3Bucket:           s3Bucket,
+		DynamodbTable:      dynamodbTable,
 		ValidateTf:         validateTf,
 		TFVersion:          tfVersion,
 	}, nil

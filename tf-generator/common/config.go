@@ -14,6 +14,7 @@ type Config struct {
 	GenerateTfState    bool
 	S3Backend          bool
 	S3Bucket           string
+	DynamodbTable      string
 	ValidateTf         bool
 	AccountID          string
 	TFCodePath         string

@@ -29,7 +29,8 @@ export tenant_project="admin-tenant" # Project name for tenant, Default is admin
 export tf_version=0.14.11  # Terraform version to be used, Default is 0.14.11.
 export validate_tf="false" # Whether to validate generated tf code, Default is true.
 export s3_backend="true"   # Whether to use s3 backend or not, Default is false.
-export s3_bucket="backend-bucket" # This is needed when `s3_backend` is set to true.
+export s3_bucket="tfstate-bucket" # This is needed when `s3_backend` is set to true.
+export dynamodb_table="tfstate-lock-table" # This can be optionally used when `s3_backend` is set to true.
 export generate_tf_state="false" # Whether to import generated tf resources, Default is false. 
                                  # If true please use 'AWS_PROFILE' environment variable, This is required for s3 backend.
 ```

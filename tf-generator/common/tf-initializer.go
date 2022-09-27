@@ -32,10 +32,8 @@ func (tfi *TfInitializer) InitWithWorkspace() *tfexec.Terraform {
 	if err != nil {
 		log.Fatalf("error running NewTerraform: %s", err)
 	}
-	//backend := "-backend-config=bucket=duplo-tfstate-" + config.AccountID + " -backend-config=dynamodb_table=duplo-tfstate-" + config.AccountID + "-lock"
-	//err = tf.Init(context.Background(), tfexec.Upgrade(true), tfexec.BackendConfig("bucket=duplo-tfstate-"+config.AccountID), tfexec.BackendConfig("dynamodb_table=duplo-tfstate-"+config.AccountID+"-lock"))
 	if tfi.Config.S3Backend {
-		err = tf.Init(context.Background(), tfexec.Upgrade(true), tfexec.BackendConfig("bucket=duplo-tfstate-"+tfi.Config.AccountID))
+		err = tf.Init(context.Background(), tfexec.Upgrade(true), tfexec.BackendConfig("bucket="+tfi.Config.S3Bucket))
 	} else {
 		err = tf.Init(context.Background(), tfexec.Upgrade(true))
 	}
@@ -87,7 +85,12 @@ func (tfi *TfInitializer) Init(config *Config, workingDir string) *tfexec.Terraf
 		log.Fatalf("error running NewTerraform: %s", err)
 	}
 	if config.S3Backend {
-		err = tf.Init(context.Background(), tfexec.Upgrade(true), tfexec.BackendConfig("bucket=duplo-tfstate-"+config.AccountID), tfexec.BackendConfig("dynamodb_table=duplo-tfstate-"+config.AccountID+"-lock"))
+		if len(config.DynamodbTable) > 0 {
+			err = tf.Init(context.Background(), tfexec.Upgrade(true), tfexec.BackendConfig("bucket="+config.AccountID), tfexec.BackendConfig("dynamodb_table="+config.DynamodbTable))
+		} else {
+			err = tf.Init(context.Background(), tfexec.Upgrade(true), tfexec.BackendConfig("bucket="+config.AccountID))
+		}
+
 	} else {
 		err = tf.Init(context.Background(), tfexec.Upgrade(true))
 	}
