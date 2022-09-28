@@ -35,7 +35,7 @@ const (
 
 const AWS_INSTANCE = "aws_instance"
 const EC2_VAR_PREFIX = "ec2_instance_"
-const FILE_NAME_PREFIX = "aws-instance-"
+const EC2_FILE_NAME_PREFIX = "aws-instance-"
 
 type AwsInstance struct {
 }
@@ -51,7 +51,7 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 	}
 	tfContext := common.TFContext{}
 	importConfigs := []common.ImportConfig{}
-	if list != nil {
+	if list != nil && len(*list) > 0 {
 		instanceIdNameMap := map[string]string{}
 		instanceIds := []string{}
 
@@ -91,7 +91,7 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 						// create new empty hcl file object
 						hclFile := hclwrite.NewEmptyFile()
 
-						path := filepath.Join(workingDir, FILE_NAME_PREFIX+shortName+".tf")
+						path := filepath.Join(workingDir, EC2_FILE_NAME_PREFIX+shortName+".tf")
 						tfFile, err := os.Create(path)
 						if err != nil {
 							fmt.Println(err)
