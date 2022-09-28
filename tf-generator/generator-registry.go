@@ -6,6 +6,7 @@ import (
 
 var TenantGenerators = []Generator{
 	&tenant.AwsVars{},
+	&tenant.TenantMain{},
 	&tenant.TenantIAM{},
 	&tenant.AwsInstance{},
 }

@@ -102,7 +102,7 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 
 						// Add aws_instance resource
 						ec2Block := rootBody.AppendNewBlock("resource",
-							[]string{"aws_instance",
+							[]string{AWS_INSTANCE,
 								resourceName})
 						ec2Body := ec2Block.Body()
 						ec2Body.SetAttributeTraversal(AMI, hcl.Traversal{
@@ -174,9 +174,12 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 						// Import all created resources.
 						if config.GenerateTfState {
 							importConfigs = append(importConfigs, common.ImportConfig{
-								ResourceAddress: "aws_instance." + resourceName,
-								ResourceId:      *instance.InstanceId,
-								WorkingDir:      workingDir,
+								ResourceAddress: strings.Join([]string{
+									AWS_INSTANCE,
+									resourceName,
+								}, "."),
+								ResourceId: *instance.InstanceId,
+								WorkingDir: workingDir,
 							})
 							tfContext.ImportConfigs = importConfigs
 						}
@@ -229,15 +232,23 @@ func generateEC2InstanceOutputVars(prefix, resourceName string) []common.OutputV
 	outVarConfigs := make(map[string]common.OutputVarConfig)
 
 	var1 := common.OutputVarConfig{
-		Name:          prefix + "private_ip",
-		ActualVal:     "aws_instance." + resourceName + ".private_ip",
+		Name: prefix + "private_ip",
+		ActualVal: strings.Join([]string{
+			AWS_INSTANCE,
+			resourceName,
+			"private_ip",
+		}, "."),
 		DescVal:       "The AWS EC2 instance Private IP.",
 		RootTraversal: true,
 	}
 	outVarConfigs["private_ip"] = var1
 	var2 := common.OutputVarConfig{
-		Name:          prefix + "public_ip",
-		ActualVal:     "aws_instance." + resourceName + ".public_ip",
+		Name: prefix + "public_ip",
+		ActualVal: strings.Join([]string{
+			AWS_INSTANCE,
+			resourceName,
+			"public_ip",
+		}, "."),
 		DescVal:       "The public IP address assigned to the instance.",
 		RootTraversal: true,
 	}

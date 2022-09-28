@@ -12,6 +12,13 @@ func (awsVars *AwsVars) Generate(config *common.Config, client *duplosdk.Client)
 	tfContext := common.TFContext{}
 	varConfigs := make(map[string]common.VarConfig)
 
+	tenantVar := common.VarConfig{
+		Name:       "tenant_name",
+		DefaultVal: config.TenantName,
+		TypeVal:    "string",
+	}
+	varConfigs["tenant_name"] = tenantVar
+
 	regionVar := common.VarConfig{
 		Name:       "region",
 		DefaultVal: config.AwsRegion,
