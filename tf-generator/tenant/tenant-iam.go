@@ -20,11 +20,11 @@ import (
 )
 
 const (
-	NAME               string = "name"
+	ROLE_NAME          string = "name"
 	PATH               string = "path"
 	ROLE               string = "role"
 	POLICY_ARN         string = "policy_arn"
-	DESCRIPTION        string = "description"
+	ROLE_DESCRIPTION   string = "description"
 	ASSUME_ROLE_POLICY string = "assume_role_policy"
 	INLINE_POLICY      string = "inline_policy"
 	POLICY             string = "policy"
@@ -77,7 +77,7 @@ func (tenantIAM *TenantIAM) Generate(config *common.Config, client *duplosdk.Cli
 				resourceName})
 		iamRoleBody := iamRoleBlock.Body()
 
-		iamRoleBody.SetAttributeTraversal(NAME, hcl.Traversal{
+		iamRoleBody.SetAttributeTraversal(ROLE_NAME, hcl.Traversal{
 			hcl.TraverseRoot{
 				Name: "local",
 			},
@@ -134,7 +134,7 @@ func (tenantIAM *TenantIAM) Generate(config *common.Config, client *duplosdk.Cli
 				inlinePolicyBlock := iamRoleBody.AppendNewBlock("inline_policy",
 					nil)
 				inlinePolicyBody := inlinePolicyBlock.Body()
-				inlinePolicyBody.SetAttributeValue(NAME,
+				inlinePolicyBody.SetAttributeValue(ROLE_NAME,
 					cty.StringVal(policyName))
 				if getRolePolicyOutput.PolicyDocument != nil {
 					decodedInlinePolicyDocument, err := url.QueryUnescape(*getRolePolicyOutput.PolicyDocument)
@@ -184,14 +184,14 @@ func (tenantIAM *TenantIAM) Generate(config *common.Config, client *duplosdk.Cli
 					[]string{AWS_IAM_POLICY,
 						policyResourceName})
 				iamPolicyBody := iamPolicyBlock.Body()
-				iamPolicyBody.SetAttributeValue(NAME,
+				iamPolicyBody.SetAttributeValue(ROLE_NAME,
 					cty.StringVal(*policyDetails.PolicyName))
 				if policyDetails.Path != nil {
 					iamPolicyBody.SetAttributeValue(PATH,
 						cty.StringVal(*policyDetails.Path))
 				}
 				if policyDetails.Description != nil {
-					iamPolicyBody.SetAttributeValue(DESCRIPTION,
+					iamPolicyBody.SetAttributeValue(ROLE_DESCRIPTION,
 						cty.StringVal(*policyDetails.Description))
 				}
 				getPolicyVersionOutput, err := iamClient.GetPolicyVersion(context.TODO(), &iam.GetPolicyVersionInput{

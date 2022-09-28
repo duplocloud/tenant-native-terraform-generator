@@ -33,7 +33,6 @@ func (tm *TenantMain) Generate(config *common.Config, client *duplosdk.Client) (
 		fmt.Println(err)
 		return nil, err
 	}
-
 	// initialize the body of the new file object
 	rootBody := hclFile.Body()
 
@@ -63,6 +62,14 @@ func (tm *TenantMain) Generate(config *common.Config, client *duplosdk.Client) (
 			Name: "region",
 		},
 	})
+	localsBlockBody.SetAttributeTraversal("vpc_id", hcl.Traversal{
+		hcl.TraverseRoot{
+			Name: "var",
+		},
+		hcl.TraverseAttr{
+			Name: "vpc_id",
+		},
+	})
 	localsBlockBody.SetAttributeTraversal("tenant_name", hcl.Traversal{
 		hcl.TraverseRoot{
 			Name: "var",
@@ -73,12 +80,37 @@ func (tm *TenantMain) Generate(config *common.Config, client *duplosdk.Client) (
 	})
 
 	tenantIAMRole := "duploservices-${var.tenant_name}"
-	dnsPrefixTokens := hclwrite.Tokens{
+	tenantIAMRoleTokens := hclwrite.Tokens{
 		{Type: hclsyntax.TokenOQuote, Bytes: []byte(`"`)},
 		{Type: hclsyntax.TokenIdent, Bytes: []byte(tenantIAMRole)},
 		{Type: hclsyntax.TokenCQuote, Bytes: []byte(`"`)},
 	}
-	localsBlockBody.SetAttributeRaw("tenant_iam_role_name", dnsPrefixTokens)
+	localsBlockBody.SetAttributeRaw("tenant_iam_role_name", tenantIAMRoleTokens)
+
+	tenantSG := "duploservices-${var.tenant_name}"
+	tenantSGTokens := hclwrite.Tokens{
+		{Type: hclsyntax.TokenOQuote, Bytes: []byte(`"`)},
+		{Type: hclsyntax.TokenIdent, Bytes: []byte(tenantSG)},
+		{Type: hclsyntax.TokenCQuote, Bytes: []byte(`"`)},
+	}
+	localsBlockBody.SetAttributeRaw("tenant_sg_name", tenantSGTokens)
+
+	tenantLBSG := "duploservices-${var.tenant_name}-lb"
+	tenantLBSGTokens := hclwrite.Tokens{
+		{Type: hclsyntax.TokenOQuote, Bytes: []byte(`"`)},
+		{Type: hclsyntax.TokenIdent, Bytes: []byte(tenantLBSG)},
+		{Type: hclsyntax.TokenCQuote, Bytes: []byte(`"`)},
+	}
+	localsBlockBody.SetAttributeRaw("tenant_lb_sg_name", tenantLBSGTokens)
+
+	tenantALBSG := "duploservices-${var.tenant_name}-alb"
+	tenantALBSGTokens := hclwrite.Tokens{
+		{Type: hclsyntax.TokenOQuote, Bytes: []byte(`"`)},
+		{Type: hclsyntax.TokenIdent, Bytes: []byte(tenantALBSG)},
+		{Type: hclsyntax.TokenCQuote, Bytes: []byte(`"`)},
+	}
+	localsBlockBody.SetAttributeRaw("tenant_alb_sg_name", tenantALBSGTokens)
+
 	rootBody.AppendNewline()
 
 	fmt.Printf("%s", hclFile.Bytes())

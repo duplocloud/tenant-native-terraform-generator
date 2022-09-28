@@ -53,6 +53,7 @@ func main() {
 		log.Fatalf("error getting aws account id from duplo: %s", err)
 	}
 	config.AccountID = accountID
+	config.TenantPlanName = tenantConfig.PlanID
 	awsCreds, err := client.TenantGetAwsCredentials(config.TenantId)
 	if err != nil {
 		log.Fatalf("error getting aws region from duplo: %s", err)

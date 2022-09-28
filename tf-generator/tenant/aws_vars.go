@@ -11,6 +11,14 @@ type AwsVars struct {
 func (awsVars *AwsVars) Generate(config *common.Config, client *duplosdk.Client) (*common.TFContext, error) {
 	tfContext := common.TFContext{}
 	varConfigs := make(map[string]common.VarConfig)
+	infraConfig, _ := client.InfrastructureGetConfig(config.TenantPlanName)
+
+	vpcVar := common.VarConfig{
+		Name:       "vpc_id",
+		DefaultVal: infraConfig.Vnet.ID,
+		TypeVal:    "string",
+	}
+	varConfigs["vpc_id"] = vpcVar
 
 	tenantVar := common.VarConfig{
 		Name:       "tenant_name",

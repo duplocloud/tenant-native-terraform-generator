@@ -66,7 +66,7 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 		svc := ec2.NewFromConfig(config.AwsClientConfig)
 		resp, err := svc.DescribeInstances(context.TODO(), &ec2.DescribeInstancesInput{InstanceIds: instanceIds})
 		if err != nil {
-			fmt.Println(clientErr)
+			fmt.Println(err)
 			return nil, err
 		}
 		b, err := json.Marshal(resp)
