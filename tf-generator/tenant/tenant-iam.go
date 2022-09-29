@@ -253,7 +253,24 @@ func (tenantIAM *TenantIAM) Generate(config *common.Config, client *duplosdk.Cli
 						Name: "arn",
 					},
 				})
-
+				if config.GenerateTfState {
+					importConfigs = append(importConfigs, common.ImportConfig{
+						ResourceAddress: strings.Join([]string{
+							AWS_IAM_POLICY,
+							policyResourceName,
+						}, "."),
+						ResourceId: *policy.PolicyArn,
+						WorkingDir: workingDir,
+					}, common.ImportConfig{
+						ResourceAddress: strings.Join([]string{
+							AWS_IAM_ROLE_POLICY_ATTACHMENT,
+							policyResourceName + "_attach",
+						}, "."),
+						ResourceId: iamRoleName + "/" + *policy.PolicyArn,
+						WorkingDir: workingDir,
+					})
+					tfContext.ImportConfigs = importConfigs
+				}
 			}
 		}
 		// Import all created resources.
