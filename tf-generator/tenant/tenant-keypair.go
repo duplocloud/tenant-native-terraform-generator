@@ -1,11 +1,15 @@
 package tenant
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"tenant-native-terraform-generator/duplosdk"
+
+	"github.com/aws/aws-sdk-go-v2/service/ec2"
 
 	"tenant-native-terraform-generator/tf-generator/common"
 
@@ -19,6 +23,7 @@ const (
 	KEYPAIR_RSA_BITS   string = "rsa_bits"
 	KEYPAIR_KEY_NAME   string = "key_name"
 	KEYPAIR_PUBLIC_KEY string = "public_key"
+	KEYPAIR_TAGS       string = "tags"
 )
 
 const AWS_KEY_PAIR = "aws_key_pair"
@@ -34,16 +39,23 @@ func (tenantKeyPair *TenantKeyPair) Generate(config *common.Config, client *dupl
 	tfContext := common.TFContext{}
 	importConfigs := []common.ImportConfig{}
 	keyPairName := "duploservices-" + config.TenantName
-
-	// ec2Client := ec2.NewFromConfig(config.AwsClientConfig)
-	// describeKeyPairsOutput, err := ec2Client.DescribeKeyPairs(context.TODO(), &ec2.DescribeKeyPairsInput{
-	// 	KeyNames: []string{keyPairName},
-	// })
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return nil, err
-	// }
-
+	includePublicKey := true
+	ec2Client := ec2.NewFromConfig(config.AwsClientConfig)
+	describeKeyPairsOutput, err := ec2Client.DescribeKeyPairs(context.TODO(), &ec2.DescribeKeyPairsInput{
+		KeyNames:         []string{keyPairName},
+		IncludePublicKey: &includePublicKey,
+	})
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	b, err := json.Marshal(describeKeyPairsOutput)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("||==================================================================||")
+	fmt.Println(string(b))
+	fmt.Println("||==================================================================||")
 	resourceName := TENANT_KEYPAIR
 	hclFile := hclwrite.NewEmptyFile()
 	path := filepath.Join(workingDir, TENANT_KEYPAIR_FILE_NAME+".tf")
@@ -52,17 +64,21 @@ func (tenantKeyPair *TenantKeyPair) Generate(config *common.Config, client *dupl
 		fmt.Println(err)
 		return nil, err
 	}
+
+	inputVars := generateTenantKeyPairVars(describeKeyPairsOutput)
+	tfContext.InputVars = append(tfContext.InputVars, inputVars...)
+
 	rootBody := hclFile.Body()
 
-	// Add tls_private_key resource
-	tlsBlock := rootBody.AppendNewBlock("resource",
-		[]string{TLS_PRIVATE_KEY,
-			resourceName})
-	tlsBody := tlsBlock.Body()
-	tlsBody.SetAttributeValue(KEYPAIR_ALGORITHM,
-		cty.StringVal("RSA"))
-	tlsBody.SetAttributeValue(KEYPAIR_RSA_BITS,
-		cty.NumberIntVal(int64(4096)))
+	// // Add tls_private_key resource
+	// tlsBlock := rootBody.AppendNewBlock("resource",
+	// 	[]string{TLS_PRIVATE_KEY,
+	// 		resourceName})
+	// tlsBody := tlsBlock.Body()
+	// tlsBody.SetAttributeValue(KEYPAIR_ALGORITHM,
+	// 	cty.StringVal("RSA"))
+	// tlsBody.SetAttributeValue(KEYPAIR_RSA_BITS,
+	// 	cty.NumberIntVal(int64(4096)))
 
 	// Add aws_key_pair resource
 	kpBlock := rootBody.AppendNewBlock("resource",
@@ -79,12 +95,19 @@ func (tenantKeyPair *TenantKeyPair) Generate(config *common.Config, client *dupl
 	})
 	kpBody.SetAttributeTraversal(KEYPAIR_PUBLIC_KEY, hcl.Traversal{
 		hcl.TraverseRoot{
-			Name: "tls_private_key." + resourceName,
+			Name: "var",
 		},
 		hcl.TraverseAttr{
-			Name: "public_key_openssh",
+			Name: "tenant_key_pair_public_key",
 		},
 	})
+	if describeKeyPairsOutput != nil && len(describeKeyPairsOutput.KeyPairs) > 0 && len(describeKeyPairsOutput.KeyPairs[0].Tags) > 0 {
+		newMap := make(map[string]cty.Value)
+		for _, tag := range describeKeyPairsOutput.KeyPairs[0].Tags {
+			newMap[*tag.Key] = cty.StringVal(*tag.Value)
+		}
+		kpBody.SetAttributeValue(KEYPAIR_TAGS, cty.MapVal(newMap))
+	}
 	if config.GenerateTfState {
 		importConfigs = append(importConfigs, common.ImportConfig{
 			ResourceAddress: strings.Join([]string{
@@ -102,4 +125,21 @@ func (tenantKeyPair *TenantKeyPair) Generate(config *common.Config, client *dupl
 		return nil, err
 	}
 	return &tfContext, nil
+}
+
+func generateTenantKeyPairVars(keypair *ec2.DescribeKeyPairsOutput) []common.VarConfig {
+	varConfigs := make(map[string]common.VarConfig)
+
+	publicKeyVar := common.VarConfig{
+		Name:       "tenant_key_pair_public_key",
+		DefaultVal: *keypair.KeyPairs[0].PublicKey,
+		TypeVal:    "string",
+	}
+	varConfigs["tenant_key_pair_public_key"] = publicKeyVar
+
+	vars := make([]common.VarConfig, len(varConfigs))
+	for _, v := range varConfigs {
+		vars = append(vars, v)
+	}
+	return vars
 }

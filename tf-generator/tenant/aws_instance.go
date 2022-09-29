@@ -63,8 +63,8 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 			instanceIdNameMap[host.InstanceID] = shortName
 			instanceIds = append(instanceIds, host.InstanceID)
 		}
-		svc := ec2.NewFromConfig(config.AwsClientConfig)
-		resp, err := svc.DescribeInstances(context.TODO(), &ec2.DescribeInstancesInput{InstanceIds: instanceIds})
+		ec2Client := ec2.NewFromConfig(config.AwsClientConfig)
+		resp, err := ec2Client.DescribeInstances(context.TODO(), &ec2.DescribeInstancesInput{InstanceIds: instanceIds})
 		if err != nil {
 			fmt.Println(err)
 			return nil, err
@@ -124,8 +124,20 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 						ec2Body.SetAttributeValue(AVAILABILITY_ZONE,
 							cty.StringVal(*instance.Placement.AvailabilityZone))
 						if instance.IamInstanceProfile != nil && instance.IamInstanceProfile.Arn != nil {
-							ec2Body.SetAttributeValue(IAM_INSTANCE_PROFILE,
-								cty.StringVal(strings.SplitN(*instance.IamInstanceProfile.Arn, ":instance-profile/", 2)[1]))
+							roleName := strings.SplitN(*instance.IamInstanceProfile.Arn, ":instance-profile/", 2)[1]
+							if "duploservices-"+config.TenantName == roleName {
+								ec2Body.SetAttributeTraversal(IAM_INSTANCE_PROFILE, hcl.Traversal{
+									hcl.TraverseRoot{
+										Name: AWS_IAM_ROLE + "." + TENANT_IAM,
+									},
+									hcl.TraverseAttr{
+										Name: "name",
+									},
+								})
+							} else {
+								ec2Body.SetAttributeValue(IAM_INSTANCE_PROFILE,
+									cty.StringVal(roleName))
+							}
 						}
 
 						ec2Body.SetAttributeValue(AVAILABILITY_ZONE,
@@ -145,8 +157,19 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 								cty.StringVal(*instance.SubnetId))
 						}
 						if instance.KeyName != nil {
-							ec2Body.SetAttributeValue(KEY_NAME,
-								cty.StringVal(*instance.KeyName))
+							if "duploservices-"+config.TenantName == *instance.KeyName {
+								ec2Body.SetAttributeTraversal(KEY_NAME, hcl.Traversal{
+									hcl.TraverseRoot{
+										Name: "aws_key_pair.tenant_keypair",
+									},
+									hcl.TraverseAttr{
+										Name: "key_name",
+									},
+								})
+							} else {
+								ec2Body.SetAttributeValue(KEY_NAME,
+									cty.StringVal(*instance.KeyName))
+							}
 						}
 						if instance.EbsOptimized != nil && *instance.EbsOptimized {
 							ec2Body.SetAttributeValue(EBS_OPTIMIZED,

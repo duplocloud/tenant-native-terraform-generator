@@ -117,7 +117,7 @@ func (tenantKMS *TenantKMS) Generate(config *common.Config, client *duplosdk.Cli
 			}
 			replaceStr := strings.Join([]string{"${" +
 				AWS_IAM_ROLE,
-				common.GetResourceName(iamRoleName), "arn}",
+				TENANT_IAM, "arn}",
 			}, ".")
 			accountIdStr := "${local.account_id}"
 			policyMapStr = strings.Replace(policyMapStr, *getRoleOutput.Role.Arn, replaceStr, -1)

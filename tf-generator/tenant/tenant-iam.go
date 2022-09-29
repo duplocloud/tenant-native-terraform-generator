@@ -59,7 +59,7 @@ func (tenantIAM *TenantIAM) Generate(config *common.Config, client *duplosdk.Cli
 
 	if getRoleOutput != nil && getRoleOutput.Role != nil {
 		iamRole := getRoleOutput.Role
-		resourceName := common.GetResourceName(iamRoleName)
+		resourceName := TENANT_IAM
 
 		hclFile := hclwrite.NewEmptyFile()
 
