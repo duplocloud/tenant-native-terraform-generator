@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.17.5
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.54.4
 	github.com/aws/aws-sdk-go-v2/service/iam v1.18.19
+	github.com/aws/aws-sdk-go-v2/service/kms v1.18.11
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/hc-install v0.4.0
 	github.com/hashicorp/hcl/v2 v2.14.0

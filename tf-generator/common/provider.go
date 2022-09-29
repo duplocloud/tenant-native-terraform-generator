@@ -52,6 +52,11 @@ func (p *Provider) Generate(config *Config, client *duplosdk.Client) {
 			"source":  cty.StringVal("hashicorp/aws"),
 			"version": cty.StringVal("~> " + config.AwsProviderVersion),
 		}))
+	reqProvsBlockBody.SetAttributeValue("tls",
+		cty.ObjectVal(map[string]cty.Value{
+			"source":  cty.StringVal("hashicorp/tls"),
+			"version": cty.StringVal("~> 4.0.3"),
+		}))
 
 	awsProvider := rootBody.AppendNewBlock("provider",
 		[]string{"aws"})

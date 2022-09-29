@@ -54,6 +54,14 @@ func (tm *TenantMain) Generate(config *common.Config, client *duplosdk.Client) (
 		nil)
 	localsBlockBody := localsBlock.Body()
 
+	localsBlockBody.SetAttributeTraversal("account_id", hcl.Traversal{
+		hcl.TraverseRoot{
+			Name: "data.aws_caller_identity.current",
+		},
+		hcl.TraverseAttr{
+			Name: "account_id",
+		},
+	})
 	localsBlockBody.SetAttributeTraversal("region", hcl.Traversal{
 		hcl.TraverseRoot{
 			Name: "var",
@@ -78,6 +86,14 @@ func (tm *TenantMain) Generate(config *common.Config, client *duplosdk.Client) (
 			Name: "tenant_name",
 		},
 	})
+
+	tenantPrefix := "duploservices-${var.tenant_name}"
+	tenantPrefixTokens := hclwrite.Tokens{
+		{Type: hclsyntax.TokenOQuote, Bytes: []byte(`"`)},
+		{Type: hclsyntax.TokenIdent, Bytes: []byte(tenantPrefix)},
+		{Type: hclsyntax.TokenCQuote, Bytes: []byte(`"`)},
+	}
+	localsBlockBody.SetAttributeRaw("tenant_prefix", tenantPrefixTokens)
 
 	tenantIAMRole := "duploservices-${var.tenant_name}"
 	tenantIAMRoleTokens := hclwrite.Tokens{

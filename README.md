@@ -19,7 +19,6 @@ export cert_arn="arn:aws:acm:us-west-2:128329325849:certificate/1234567890-aaaa-
 export duplo_host="https://msp.duplocloud.net"
 export duplo_token="xxx-xxxxx-xxxxxxxx"
 export AWS_PROFILE="AWS_PROFILE"
-export aws_account_id="1234567890"
 ```
 You can optionally pass following environment variables.
 
