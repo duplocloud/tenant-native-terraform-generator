@@ -11,6 +11,7 @@ import (
 
 	"tenant-native-terraform-generator/tf-generator/common"
 
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
@@ -97,8 +98,16 @@ func (tenantKMS *TenantKMS) Generate(config *common.Config, client *duplosdk.Cli
 			cty.BoolVal(true))
 
 		if getKeyPolicyOutput != nil && getKeyPolicyOutput.Policy != nil {
+			iamClient := iam.NewFromConfig(config.AwsClientConfig)
+			iamRoleName := "duploservices-" + config.TenantName
+			// Get Role
+			getRoleOutput, err := iamClient.GetRole(context.TODO(), &iam.GetRoleInput{RoleName: &iamRoleName})
+			if err != nil {
+				fmt.Println(err)
+				return nil, err
+			}
 			var policyMap interface{}
-			err := json.Unmarshal([]byte(*getKeyPolicyOutput.Policy), &policyMap)
+			err = json.Unmarshal([]byte(*getKeyPolicyOutput.Policy), &policyMap)
 			if err != nil {
 				panic(err)
 			}
@@ -106,6 +115,14 @@ func (tenantKMS *TenantKMS) Generate(config *common.Config, client *duplosdk.Cli
 			if err != nil {
 				panic(err)
 			}
+			replaceStr := strings.Join([]string{"${" +
+				AWS_IAM_ROLE,
+				common.GetResourceName(iamRoleName), "arn}",
+			}, ".")
+			accountIdStr := "${local.account_id}"
+			policyMapStr = strings.Replace(policyMapStr, *getRoleOutput.Role.Arn, replaceStr, -1)
+			policyMapStr = strings.Replace(policyMapStr, config.AccountID, accountIdStr, -1)
+
 			kmsBody.SetAttributeTraversal(KMS_POLICY, hcl.Traversal{
 				hcl.TraverseRoot{
 					Name: "jsonencode(" + policyMapStr + ")",
@@ -142,6 +159,13 @@ func (tenantKMS *TenantKMS) Generate(config *common.Config, client *duplosdk.Cli
 					resourceName,
 				}, "."),
 				ResourceId: *describeKeyOutput.KeyMetadata.KeyId,
+				WorkingDir: workingDir,
+			}, common.ImportConfig{
+				ResourceAddress: strings.Join([]string{
+					AWS_KMS_ALIAS,
+					resourceName,
+				}, "."),
+				ResourceId: "alias/" + duplo.KeyName,
 				WorkingDir: workingDir,
 			})
 			tfContext.ImportConfigs = importConfigs

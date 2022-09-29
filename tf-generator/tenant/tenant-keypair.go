@@ -34,6 +34,16 @@ func (tenantKeyPair *TenantKeyPair) Generate(config *common.Config, client *dupl
 	tfContext := common.TFContext{}
 	importConfigs := []common.ImportConfig{}
 	keyPairName := "duploservices-" + config.TenantName
+
+	// ec2Client := ec2.NewFromConfig(config.AwsClientConfig)
+	// describeKeyPairsOutput, err := ec2Client.DescribeKeyPairs(context.TODO(), &ec2.DescribeKeyPairsInput{
+	// 	KeyNames: []string{keyPairName},
+	// })
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return nil, err
+	// }
+
 	resourceName := TENANT_KEYPAIR
 	hclFile := hclwrite.NewEmptyFile()
 	path := filepath.Join(workingDir, TENANT_KEYPAIR_FILE_NAME+".tf")

@@ -97,6 +97,8 @@ func (tenantIAM *TenantIAM) Generate(config *common.Config, client *duplosdk.Cli
 
 			decodedAssumeRolePolicyDocument = strings.Replace(decodedAssumeRolePolicyDocument, iamRoleName, "${local.tenant_iam_role_name}", -1)
 			decodedAssumeRolePolicyDocument = strings.Replace(decodedAssumeRolePolicyDocument, config.TenantName, "${local.tenant_name}", -1)
+			accountIdStr := "${local.account_id}"
+			decodedAssumeRolePolicyDocument = strings.Replace(decodedAssumeRolePolicyDocument, config.AccountID, accountIdStr, -1)
 			assumeRolePolicyDocumentMap := make(map[string]interface{})
 			if err := json.Unmarshal([]byte(decodedAssumeRolePolicyDocument), &assumeRolePolicyDocumentMap); err != nil {
 				log.Fatal(err)
@@ -140,6 +142,8 @@ func (tenantIAM *TenantIAM) Generate(config *common.Config, client *duplosdk.Cli
 					decodedInlinePolicyDocument, err := url.QueryUnescape(*getRolePolicyOutput.PolicyDocument)
 					decodedInlinePolicyDocument = strings.Replace(decodedInlinePolicyDocument, iamRoleName, "${local.tenant_iam_role_name}", -1)
 					decodedInlinePolicyDocument = strings.Replace(decodedInlinePolicyDocument, config.TenantName, "${local.tenant_name}", -1)
+					accountIdStr := "${local.account_id}"
+					decodedInlinePolicyDocument = strings.Replace(decodedInlinePolicyDocument, config.AccountID, accountIdStr, -1)
 					if err != nil {
 						log.Fatal(err)
 						return nil, err
@@ -206,6 +210,8 @@ func (tenantIAM *TenantIAM) Generate(config *common.Config, client *duplosdk.Cli
 					decodedManagedPolicyDocument, err := url.QueryUnescape(*getPolicyVersionOutput.PolicyVersion.Document)
 					decodedManagedPolicyDocument = strings.Replace(decodedManagedPolicyDocument, iamRoleName, "${local.tenant_iam_role_name}", -1)
 					decodedManagedPolicyDocument = strings.Replace(decodedManagedPolicyDocument, config.TenantName, "${local.tenant_name}", -1)
+					accountIdStr := "${local.account_id}"
+					decodedManagedPolicyDocument = strings.Replace(decodedManagedPolicyDocument, config.AccountID, accountIdStr, -1)
 					if err != nil {
 						log.Fatal(err)
 						return nil, err
