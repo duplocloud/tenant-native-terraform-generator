@@ -277,6 +277,7 @@ func (tenantSG *TenantSG) Generate(config *common.Config, client *duplosdk.Clien
 				})
 				tfContext.ImportConfigs = importConfigs
 			}
+			rootBody.AppendNewline()
 			log.Printf("[TRACE] Terraform config generation done for aws security group (%s).", *sg.GroupName)
 		}
 		_, err = tfFile.Write(hclFile.Bytes())

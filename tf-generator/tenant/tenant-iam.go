@@ -184,6 +184,7 @@ func (tenantIAM *TenantIAM) Generate(config *common.Config, client *duplosdk.Cli
 				}
 				policyDetails := *getPolicyOutput.Policy
 				policyResourceName := common.GetResourceName(*policyDetails.PolicyName)
+				rootBody.AppendNewline()
 				iamPolicyBlock := rootBody.AppendNewBlock("resource",
 					[]string{AWS_IAM_POLICY,
 						policyResourceName})
@@ -232,6 +233,7 @@ func (tenantIAM *TenantIAM) Generate(config *common.Config, client *duplosdk.Cli
 					})
 				}
 				// Add 'aws_iam_role_policy_attachment' resource
+				rootBody.AppendNewline()
 				iamPolicyAttachBlock := rootBody.AppendNewBlock("resource",
 					[]string{AWS_IAM_ROLE_POLICY_ATTACHMENT,
 						common.GetResourceName(*policyDetails.PolicyName) + "_attach"})

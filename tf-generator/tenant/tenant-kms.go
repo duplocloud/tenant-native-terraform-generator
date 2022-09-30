@@ -129,7 +129,7 @@ func (tenantKMS *TenantKMS) Generate(config *common.Config, client *duplosdk.Cli
 				},
 			})
 		}
-
+		rootBody.AppendNewline()
 		kmsAliasBlock := rootBody.AppendNewBlock("resource",
 			[]string{AWS_KMS_ALIAS,
 				resourceName})

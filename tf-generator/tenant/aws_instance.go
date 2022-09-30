@@ -31,11 +31,24 @@ const (
 	SUBNET_ID                   string = "subnet_id"
 	KEY_NAME                    string = "key_name"
 	EBS_OPTIMIZED               string = "ebs_optimized"
+	USER_DATA_BASE64            string = "user_data_base64"
+	ENCRYPTED                   string = "encrypted"
+	IOPS                        string = "iops"
+	SNAPSHOT_ID                 string = "snapshot_id"
+	TYPE                        string = "type"
+	SIZE                        string = "size"
+	KMS_KEY_ID                  string = "kms_key_id"
+	THROUGHPUT                  string = "throughput"
+	DEVICE_NAME                 string = "device_name"
+	VOLUME_ID                   string = "volume_id"
+	INSTANCE_ID                 string = "instance_id"
 )
 
 const AWS_INSTANCE = "aws_instance"
 const EC2_VAR_PREFIX = "ec2_instance_"
 const EC2_FILE_NAME_PREFIX = "aws-instance-"
+const AWS_EBS_VOLUME = "aws_ebs_volume"
+const AWS_VOLUME_ATTACHMENT = "aws_volume_attachment"
 
 type AwsInstance struct {
 }
@@ -184,6 +197,134 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 							ec2Body.SetAttributeValue(TAGS, cty.MapVal(newMap))
 						}
 
+						instanceAttributeOutput, err := ec2Client.DescribeInstanceAttribute(context.TODO(), &ec2.DescribeInstanceAttributeInput{
+							Attribute: types.InstanceAttributeNameUserData, InstanceId: instance.InstanceId,
+						})
+						if err != nil {
+							fmt.Println(err)
+						}
+						if instanceAttributeOutput != nil && instanceAttributeOutput.UserData != nil && instanceAttributeOutput.UserData.Value != nil {
+							// data, err := base64.StdEncoding.DecodeString(*instanceAttributeOutput.UserData.Value)
+							// if err != nil {
+							// 	log.Fatal("error:", err)
+							// }
+							ec2Body.SetAttributeValue(USER_DATA_BASE64,
+								cty.StringVal(*instanceAttributeOutput.UserData.Value))
+						}
+
+						// Add aws_ebs_volume
+						if len(instance.BlockDeviceMappings) > 0 {
+							volIds := []string{}
+							volIdDevice := map[string]string{}
+							for _, ebs := range instance.BlockDeviceMappings {
+								volIds = append(volIds, *ebs.Ebs.VolumeId)
+								volIdDevice[*ebs.Ebs.VolumeId] = *ebs.DeviceName
+							}
+							volumesOutput, err := ec2Client.DescribeVolumes(context.TODO(), &ec2.DescribeVolumesInput{VolumeIds: volIds})
+							if err != nil {
+								fmt.Println(err)
+								return nil, err
+							}
+							if volumesOutput != nil && len(volumesOutput.Volumes) > 0 {
+								for _, vol := range volumesOutput.Volumes {
+									rootBody.AppendNewline()
+									ebsVolBlock := rootBody.AppendNewBlock("resource",
+										[]string{AWS_EBS_VOLUME,
+											resourceName + "_ebs_vol"})
+									ebsVolBody := ebsVolBlock.Body()
+									ebsVolBody.SetAttributeValue(AVAILABILITY_ZONE,
+										cty.StringVal(*vol.AvailabilityZone))
+									if vol.Encrypted != nil {
+										ebsVolBody.SetAttributeValue(ENCRYPTED,
+											cty.BoolVal(*vol.Encrypted))
+									}
+									if vol.Iops != nil {
+										ebsVolBody.SetAttributeValue(IOPS,
+											cty.NumberIntVal(int64(*vol.Iops)))
+									}
+									if vol.SnapshotId != nil {
+										ebsVolBody.SetAttributeValue(SNAPSHOT_ID,
+											cty.StringVal(*vol.SnapshotId))
+									}
+									if vol.Size != nil {
+										ebsVolBody.SetAttributeValue(SIZE,
+											cty.NumberIntVal(int64(*vol.Size)))
+									}
+									if len(vol.VolumeType) > 0 {
+										ebsVolBody.SetAttributeValue(TYPE,
+											cty.StringVal(string(vol.VolumeType)))
+									}
+									if vol.KmsKeyId != nil {
+										ebsVolBody.SetAttributeValue(KMS_KEY_ID,
+											cty.StringVal(*vol.KmsKeyId))
+									}
+									if vol.Throughput != nil {
+										ebsVolBody.SetAttributeValue(THROUGHPUT,
+											cty.NumberIntVal(int64(*vol.Throughput)))
+									}
+									if len(vol.Tags) > 0 {
+										newMap := make(map[string]cty.Value)
+										for _, tag := range vol.Tags {
+											newMap[*tag.Key] = cty.StringVal(*tag.Value)
+										}
+										ebsVolBody.SetAttributeValue(TAGS, cty.MapVal(newMap))
+									}
+
+									if config.GenerateTfState {
+										importConfigs = append(importConfigs, common.ImportConfig{
+											ResourceAddress: strings.Join([]string{
+												AWS_EBS_VOLUME,
+												resourceName + "_ebs_vol",
+											}, "."),
+											ResourceId: *vol.VolumeId,
+											WorkingDir: workingDir,
+										})
+										tfContext.ImportConfigs = importConfigs
+									}
+									rootBody.AppendNewline()
+									ebsVolAttachBlock := rootBody.AppendNewBlock("resource",
+										[]string{AWS_VOLUME_ATTACHMENT,
+											resourceName + "_ebs_vol_attach"})
+									ebsVolAttachBody := ebsVolAttachBlock.Body()
+									ebsVolAttachBody.SetAttributeValue(DEVICE_NAME,
+										cty.StringVal(volIdDevice[*vol.VolumeId]))
+
+									ebsVolAttachBody.SetAttributeTraversal(VOLUME_ID, hcl.Traversal{
+										hcl.TraverseRoot{
+											Name: AWS_EBS_VOLUME + "." + resourceName + "_ebs_vol",
+										},
+										hcl.TraverseAttr{
+											Name: "id",
+										},
+									})
+									ebsVolAttachBody.SetAttributeTraversal(INSTANCE_ID, hcl.Traversal{
+										hcl.TraverseRoot{
+											Name: AWS_INSTANCE + "." + resourceName,
+										},
+										hcl.TraverseAttr{
+											Name: "id",
+										},
+									})
+
+									if config.GenerateTfState {
+										importConfigs = append(importConfigs, common.ImportConfig{
+											ResourceAddress: strings.Join([]string{
+												AWS_VOLUME_ATTACHMENT,
+												resourceName + "_ebs_vol_attach",
+											}, "."),
+											ResourceId: strings.Join([]string{
+												volIdDevice[*vol.VolumeId],
+												*vol.VolumeId,
+												*instance.InstanceId,
+											}, ":"),
+											WorkingDir: workingDir,
+										})
+										tfContext.ImportConfigs = importConfigs
+									}
+									break
+								}
+							}
+						}
 						_, err = tfFile.Write(hclFile.Bytes())
 						if err != nil {
 							fmt.Println(err)
