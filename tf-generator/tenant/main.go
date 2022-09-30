@@ -12,7 +12,6 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclwrite"
-	"github.com/zclconf/go-cty/cty"
 )
 
 type TenantMain struct {
@@ -21,7 +20,7 @@ type TenantMain struct {
 func (tm *TenantMain) Generate(config *common.Config, client *duplosdk.Client) (*common.TFContext, error) {
 	workingDir := filepath.Join(config.TFCodePath, config.TenantProject)
 
-	log.Println("[TRACE] <====== AWS services main TF generation started. =====>")
+	log.Println("[TRACE] <====== Tenant main TF generation started. =====>")
 
 	//1. ==========================================================================================
 	// Generate locals
@@ -34,7 +33,6 @@ func (tm *TenantMain) Generate(config *common.Config, client *duplosdk.Client) (
 		fmt.Println(err)
 		return nil, err
 	}
-
 	// initialize the body of the new file object
 	rootBody := hclFile.Body()
 
@@ -55,13 +53,15 @@ func (tm *TenantMain) Generate(config *common.Config, client *duplosdk.Client) (
 	localsBlock := rootBody.AppendNewBlock("locals",
 		nil)
 	localsBlockBody := localsBlock.Body()
-	tfstateBucketTokens := hclwrite.Tokens{
-		{Type: hclsyntax.TokenOQuote, Bytes: []byte(`"`)},
-		{Type: hclsyntax.TokenIdent, Bytes: []byte(`duplo-tfstate-${data.aws_caller_identity.current.account_id}`)},
-		{Type: hclsyntax.TokenCQuote, Bytes: []byte(`"`)},
-	}
-	localsBlockBody.SetAttributeRaw("tfstate_bucket", tfstateBucketTokens)
 
+	localsBlockBody.SetAttributeTraversal("account_id", hcl.Traversal{
+		hcl.TraverseRoot{
+			Name: "data.aws_caller_identity.current",
+		},
+		hcl.TraverseAttr{
+			Name: "account_id",
+		},
+	})
 	localsBlockBody.SetAttributeTraversal("region", hcl.Traversal{
 		hcl.TraverseRoot{
 			Name: "var",
@@ -70,127 +70,64 @@ func (tm *TenantMain) Generate(config *common.Config, client *duplosdk.Client) (
 			Name: "region",
 		},
 	})
-	localsBlockBody.SetAttributeTraversal("tenant_id", hcl.Traversal{
+	localsBlockBody.SetAttributeTraversal("vpc_id", hcl.Traversal{
 		hcl.TraverseRoot{
-			Name: "data.terraform_remote_state",
+			Name: "var",
 		},
 		hcl.TraverseAttr{
-			Name: "tenant.outputs[\"tenant_id\"]",
-		},
-	})
-	localsBlockBody.SetAttributeTraversal("cert_arn", hcl.Traversal{
-		hcl.TraverseRoot{
-			Name: "data.terraform_remote_state",
-		},
-		hcl.TraverseAttr{
-			Name: "tenant.outputs[\"cert_arn\"]",
+			Name: "vpc_id",
 		},
 	})
 	localsBlockBody.SetAttributeTraversal("tenant_name", hcl.Traversal{
 		hcl.TraverseRoot{
-			Name: "data.terraform_remote_state",
+			Name: "var",
 		},
 		hcl.TraverseAttr{
-			Name: "tenant.outputs[\"tenant_name\"]",
-		},
-	})
-	rootBody.AppendNewline()
-
-	tenantKmsBlock := rootBody.AppendNewBlock("data",
-		[]string{"duplocloud_tenant_aws_kms_key",
-			"tenant_kms"})
-	tenantKmsBody := tenantKmsBlock.Body()
-	tenantKmsBody.SetAttributeTraversal("tenant_id", hcl.Traversal{
-		hcl.TraverseRoot{
-			Name: "local",
-		},
-		hcl.TraverseAttr{
-			Name: "tenant_id",
-		},
-	})
-	rootBody.AppendNewline()
-
-	remoteStateBlock := rootBody.AppendNewBlock("data",
-		[]string{"terraform_remote_state",
-			"tenant"})
-	remoteStateBody := remoteStateBlock.Body()
-	remoteStateBody.SetAttributeValue("backend",
-		cty.StringVal("s3"))
-	remoteStateBody.SetAttributeTraversal("workspace", hcl.Traversal{
-		hcl.TraverseRoot{
-			Name: "terraform",
-		},
-		hcl.TraverseAttr{
-			Name: "workspace",
+			Name: "tenant_name",
 		},
 	})
 
-	//configMap := map[string]cty.Value{}
-	// tokens := hclwrite.Tokens{
-	// 	//{Type: hclsyntax.TokenOQuote, Bytes: []byte(`"`)},
-	// 	//{Type: hclsyntax.TokenTemplateInterp, Bytes: []byte(`${`)},
-	// 	{Type: hclsyntax.TokenIdent, Bytes: []byte(`local.tfstate_bucket`)},
-	// 	//{Type: hclsyntax.TokenTemplateSeqEnd, Bytes: []byte(`}`)},
-	// 	//{Type: hclsyntax.TokenCQuote, Bytes: []byte(`"`)},
-	// }
-	//remoteStateBody.SetAttributeRaw("bucket", tokens)
-
-	// configTokens := map[string]hclwrite.Tokens{
-	// 	"bucket": hclwrite.TokensForTraversal(hcl.Traversal{
-	// 		hcl.TraverseRoot{Name: "local"},
-	// 		hcl.TraverseAttr{Name: "tfstate_bucket"},
-	// 	}),
-	// 	"workspace_key_prefix": hclwrite.TokensForValue(cty.StringVal("admin:")),
-	// 	"key":                  hclwrite.TokensForValue(cty.StringVal("tenant")),
-	// 	"region": hclwrite.TokensForTraversal(hcl.Traversal{
-	// 		hcl.TraverseRoot{Name: "local"},
-	// 		hcl.TraverseAttr{Name: "region"},
-	// 	}),
-	// }
-	configTokens := []common.ObjectAttrTokens{
-		{
-			Name: hclwrite.TokensForTraversal(hcl.Traversal{
-				hcl.TraverseRoot{Name: "bucket"},
-			}),
-			Value: hclwrite.TokensForTraversal(hcl.Traversal{
-				hcl.TraverseRoot{Name: "local"},
-				hcl.TraverseAttr{Name: "tfstate_bucket"},
-			}),
-		},
-		{
-			Name: hclwrite.TokensForTraversal(hcl.Traversal{
-				hcl.TraverseRoot{Name: "workspace_key_prefix"},
-			}),
-			Value: hclwrite.TokensForValue(cty.StringVal("admin:")),
-		},
-		{
-			Name: hclwrite.TokensForTraversal(hcl.Traversal{
-				hcl.TraverseRoot{Name: "key"},
-			}),
-			Value: hclwrite.TokensForValue(cty.StringVal("tenant")),
-		},
-		{
-			Name: hclwrite.TokensForTraversal(hcl.Traversal{
-				hcl.TraverseRoot{Name: "region"},
-			}),
-			Value: hclwrite.TokensForTraversal(hcl.Traversal{
-				hcl.TraverseRoot{Name: "local"},
-				hcl.TraverseAttr{Name: "region"},
-			}),
-		},
+	tenantPrefix := "duploservices-${var.tenant_name}"
+	tenantPrefixTokens := hclwrite.Tokens{
+		{Type: hclsyntax.TokenOQuote, Bytes: []byte(`"`)},
+		{Type: hclsyntax.TokenIdent, Bytes: []byte(tenantPrefix)},
+		{Type: hclsyntax.TokenCQuote, Bytes: []byte(`"`)},
 	}
-	tokens := common.TokensForObject(configTokens)
-	remoteStateBody.SetAttributeRaw("config", tokens)
-	// 	cty.ObjectVal(configMap))
+	localsBlockBody.SetAttributeRaw("tenant_prefix", tenantPrefixTokens)
 
-	// configMap["bucket"] = cty.StringVal("${local.tfstate_bucket}")
-	// configMap["workspace_key_prefix"] = cty.StringVal("admin:")
-	// configMap["key"] = cty.StringVal("tenant")
-	// configMap["region"] = cty.StringVal("${local.region}")
+	tenantIAMRole := "duploservices-${var.tenant_name}"
+	tenantIAMRoleTokens := hclwrite.Tokens{
+		{Type: hclsyntax.TokenOQuote, Bytes: []byte(`"`)},
+		{Type: hclsyntax.TokenIdent, Bytes: []byte(tenantIAMRole)},
+		{Type: hclsyntax.TokenCQuote, Bytes: []byte(`"`)},
+	}
+	localsBlockBody.SetAttributeRaw("tenant_iam_role_name", tenantIAMRoleTokens)
 
-	// //configMap["region"] = cty.CapsuleVal("${local.region}")
-	// remoteStateBody.SetAttributeValue("config",
-	// 	cty.ObjectVal(configMap))
+	tenantSG := "duploservices-${var.tenant_name}"
+	tenantSGTokens := hclwrite.Tokens{
+		{Type: hclsyntax.TokenOQuote, Bytes: []byte(`"`)},
+		{Type: hclsyntax.TokenIdent, Bytes: []byte(tenantSG)},
+		{Type: hclsyntax.TokenCQuote, Bytes: []byte(`"`)},
+	}
+	localsBlockBody.SetAttributeRaw("tenant_sg_name", tenantSGTokens)
+
+	tenantLBSG := "duploservices-${var.tenant_name}-lb"
+	tenantLBSGTokens := hclwrite.Tokens{
+		{Type: hclsyntax.TokenOQuote, Bytes: []byte(`"`)},
+		{Type: hclsyntax.TokenIdent, Bytes: []byte(tenantLBSG)},
+		{Type: hclsyntax.TokenCQuote, Bytes: []byte(`"`)},
+	}
+	localsBlockBody.SetAttributeRaw("tenant_lb_sg_name", tenantLBSGTokens)
+
+	tenantALBSG := "duploservices-${var.tenant_name}-alb"
+	tenantALBSGTokens := hclwrite.Tokens{
+		{Type: hclsyntax.TokenOQuote, Bytes: []byte(`"`)},
+		{Type: hclsyntax.TokenIdent, Bytes: []byte(tenantALBSG)},
+		{Type: hclsyntax.TokenCQuote, Bytes: []byte(`"`)},
+	}
+	localsBlockBody.SetAttributeRaw("tenant_alb_sg_name", tenantALBSGTokens)
+
+	rootBody.AppendNewline()
 
 	fmt.Printf("%s", hclFile.Bytes())
 	_, err = tfFile.Write(hclFile.Bytes())
@@ -198,26 +135,6 @@ func (tm *TenantMain) Generate(config *common.Config, client *duplosdk.Client) (
 		fmt.Println(err)
 		return nil, err
 	}
-	log.Println("[TRACE] <====== Aws services main TF generation done. =====>")
-	return &common.TFContext{
-		InputVars: generateVars(),
-	}, nil
-}
-
-func generateVars() []common.VarConfig {
-	varConfigs := make(map[string]common.VarConfig)
-
-	regionVar := common.VarConfig{
-		Name:       "region",
-		DefaultVal: "us-west-2",
-		TypeVal:    "string",
-	}
-	varConfigs["region"] = regionVar
-
-	vars := make([]common.VarConfig, len(varConfigs))
-	for _, v := range varConfigs {
-		vars = append(vars, v)
-	}
-
-	return vars
+	log.Println("[TRACE] <====== Tenant main TF generation done. =====>")
+	return nil, nil
 }

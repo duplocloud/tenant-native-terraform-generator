@@ -7,6 +7,7 @@ type Config struct {
 	DuploToken         string
 	TenantId           string
 	TenantName         string
+	TenantPlanName     string
 	CustomerName       string
 	AdminTenantDir     string
 	AwsProviderVersion string
