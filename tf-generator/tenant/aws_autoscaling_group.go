@@ -163,8 +163,25 @@ func (awsASG *AwsASG) Generate(config *common.Config, client *duplosdk.Client) (
 						tagBody := tagBlock.Body()
 						tagBody.SetAttributeValue(KEY,
 							cty.StringVal(*tag.Key))
-						tagBody.SetAttributeValue(VALUE,
-							cty.StringVal(*tag.Value))
+						if config.TenantName == *tag.Value {
+							tagBody.SetAttributeTraversal(VALUE, hcl.Traversal{
+								hcl.TraverseRoot{
+									Name: "local",
+								},
+								hcl.TraverseAttr{
+									Name: "tenant_name",
+								},
+							})
+						} else {
+							tagValue := strings.Replace(*tag.Value, config.TenantName, "${local.tenant_name}", -1)
+							tagTokens := hclwrite.Tokens{
+								{Type: hclsyntax.TokenOQuote, Bytes: []byte(`"`)},
+								{Type: hclsyntax.TokenIdent, Bytes: []byte(tagValue)},
+								{Type: hclsyntax.TokenCQuote, Bytes: []byte(`"`)},
+							}
+							tagBody.SetAttributeRaw(VALUE, tagTokens)
+						}
+
 						tagBody.SetAttributeValue(PROPAGATE_AT_LAUNCH,
 							cty.BoolVal(*tag.PropagateAtLaunch))
 					}
