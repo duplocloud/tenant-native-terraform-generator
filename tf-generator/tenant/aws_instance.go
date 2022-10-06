@@ -192,12 +192,19 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 							}
 
 							if len(instance.Tags) > 0 {
-								newMap := make(map[string]cty.Value)
-								for _, tag := range instance.Tags {
-									//tagValue := strings.Replace(*tag.Value, config.TenantName, "${local.tenant_name}", -1)
-									newMap[*tag.Key] = cty.StringVal(*tag.Value)
+								tagsTokens := hclwrite.Tokens{
+									{Type: hclsyntax.TokenOQuote, Bytes: []byte(`{`)},
+									{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
 								}
-								ec2Body.SetAttributeValue(TAGS, cty.MapVal(newMap))
+								for _, tag := range instance.Tags {
+									tagValue := strings.Replace(*tag.Value, config.TenantName, "${local.tenant_name}", -1)
+									tag := "\"" + *tag.Key + "\"" + " = \"" + tagValue + "\"\n"
+									tagsTokens = append(tagsTokens,
+										&hclwrite.Token{Type: hclsyntax.TokenIdent, Bytes: []byte(tag)},
+									)
+								}
+								tagsTokens = append(tagsTokens, &hclwrite.Token{Type: hclsyntax.TokenCQuote, Bytes: []byte(`}`)})
+								ec2Body.SetAttributeRaw(TAGS, tagsTokens)
 							}
 
 							instanceAttributeOutput, err := ec2Client.DescribeInstanceAttribute(context.TODO(), &ec2.DescribeInstanceAttributeInput{
