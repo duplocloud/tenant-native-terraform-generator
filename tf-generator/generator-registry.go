@@ -12,4 +12,5 @@ var TenantGenerators = []Generator{
 	&tenant.TenantIAM{},
 	&tenant.TenantSG{},
 	&tenant.AwsInstance{},
+	&tenant.AwsASG{},
 }
