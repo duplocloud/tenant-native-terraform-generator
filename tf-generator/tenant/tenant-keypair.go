@@ -2,7 +2,6 @@ package tenant
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +13,7 @@ import (
 	"tenant-native-terraform-generator/tf-generator/common"
 
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/zclconf/go-cty/cty"
 )
@@ -49,13 +49,6 @@ func (tenantKeyPair *TenantKeyPair) Generate(config *common.Config, client *dupl
 		fmt.Println(err)
 		return nil, err
 	}
-	b, err := json.Marshal(describeKeyPairsOutput)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println("||==================================================================||")
-	fmt.Println(string(b))
-	fmt.Println("||==================================================================||")
 	resourceName := TENANT_KEYPAIR
 	hclFile := hclwrite.NewEmptyFile()
 	path := filepath.Join(workingDir, TENANT_KEYPAIR_FILE_NAME+".tf")
@@ -108,6 +101,16 @@ func (tenantKeyPair *TenantKeyPair) Generate(config *common.Config, client *dupl
 		}
 		kpBody.SetAttributeValue(KEYPAIR_TAGS, cty.MapVal(newMap))
 	}
+	lifecycleBlock := kpBody.AppendNewBlock("lifecycle", nil)
+	lifecycleBody := lifecycleBlock.Body()
+	ignoreChanges := "public_key"
+	ignoreChangesTokens := hclwrite.Tokens{
+		{Type: hclsyntax.TokenOQuote, Bytes: []byte(`[`)},
+		{Type: hclsyntax.TokenIdent, Bytes: []byte(ignoreChanges)},
+		{Type: hclsyntax.TokenCQuote, Bytes: []byte(`]`)},
+	}
+	lifecycleBody.SetAttributeRaw("ignore_changes", ignoreChangesTokens)
+
 	if config.GenerateTfState {
 		importConfigs = append(importConfigs, common.ImportConfig{
 			ResourceAddress: strings.Join([]string{

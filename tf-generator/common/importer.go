@@ -83,7 +83,7 @@ func (i *Importer) Import(config *Config, importConfig *ImportConfig) {
 	//fmt.Println(string(stateJson))
 
 	log.Printf("[TRACE] Terraform resource (%s, %s) is imported.", importConfig.ResourceAddress, importConfig.ResourceId)
-	log.Println("[TRACE] <====================================================================>")
+	log.Println("[TRACE] <============================================================================================>")
 }
 
 func (i *Importer) ImportWithoutInit(config *Config, importConfig *ImportConfig, tf *tfexec.Terraform) {
@@ -103,5 +103,5 @@ func (i *Importer) ImportWithoutInit(config *Config, importConfig *ImportConfig,
 	//fmt.Println(string(stateJson))
 
 	log.Printf("[TRACE] Terraform resource (%s, %s) is imported.", importConfig.ResourceAddress, importConfig.ResourceId)
-	log.Println("[TRACE] <====================================================================>")
+	log.Println("[TRACE] <=============================================================================================>")
 }

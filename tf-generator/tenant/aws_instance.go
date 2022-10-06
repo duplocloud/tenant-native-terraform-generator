@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/zclconf/go-cty/cty"
 
@@ -76,283 +77,295 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 			instanceIdNameMap[host.InstanceID] = shortName
 			instanceIds = append(instanceIds, host.InstanceID)
 		}
-		ec2Client := ec2.NewFromConfig(config.AwsClientConfig)
-		resp, err := ec2Client.DescribeInstances(context.TODO(), &ec2.DescribeInstancesInput{InstanceIds: instanceIds})
-		if err != nil {
-			fmt.Println(err)
-			return nil, err
-		}
-		b, err := json.Marshal(resp)
-		if err != nil {
-			fmt.Println(err)
-		}
-		fmt.Println("||==================================================================||")
-		fmt.Println(string(b))
-		fmt.Println("||==================================================================||")
+		if len(instanceIds) > 0 {
+			ec2Client := ec2.NewFromConfig(config.AwsClientConfig)
+			resp, err := ec2Client.DescribeInstances(context.TODO(), &ec2.DescribeInstancesInput{InstanceIds: instanceIds})
+			if err != nil {
+				fmt.Println(err)
+				return nil, err
+			}
+			b, err := json.Marshal(resp)
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println("||==================================================================||")
+			fmt.Println(string(b))
+			fmt.Println("||==================================================================||")
 
-		log.Println("[TRACE] <====== EC2 instance TF generation started. =====>")
-		if resp != nil && len(resp.Reservations) > 0 {
-			for _, reservation := range resp.Reservations {
-				if len(reservation.Instances) > 0 {
-					for _, instance := range reservation.Instances {
-						shortName := instanceIdNameMap[*instance.InstanceId]
-						resourceName := common.GetResourceName(shortName)
+			log.Println("[TRACE] <====== EC2 instance TF generation started. =====>")
+			if resp != nil && len(resp.Reservations) > 0 {
+				for _, reservation := range resp.Reservations {
+					if len(reservation.Instances) > 0 {
+						for _, instance := range reservation.Instances {
+							shortName := instanceIdNameMap[*instance.InstanceId]
+							resourceName := common.GetResourceName(shortName)
 
-						varFullPrefix := EC2_VAR_PREFIX + resourceName + "_"
-						inputVars := generateEC2InstanceVars(instance, varFullPrefix)
-						tfContext.InputVars = append(tfContext.InputVars, inputVars...)
-						// create new empty hcl file object
-						hclFile := hclwrite.NewEmptyFile()
+							varFullPrefix := EC2_VAR_PREFIX + resourceName + "_"
+							inputVars := generateEC2InstanceVars(instance, varFullPrefix)
+							tfContext.InputVars = append(tfContext.InputVars, inputVars...)
+							// create new empty hcl file object
+							hclFile := hclwrite.NewEmptyFile()
 
-						path := filepath.Join(workingDir, EC2_FILE_NAME_PREFIX+shortName+".tf")
-						tfFile, err := os.Create(path)
-						if err != nil {
-							fmt.Println(err)
-							return nil, err
-						}
-						// initialize the body of the new file object
-						rootBody := hclFile.Body()
-
-						// Add aws_instance resource
-						ec2Block := rootBody.AppendNewBlock("resource",
-							[]string{AWS_INSTANCE,
-								resourceName})
-						ec2Body := ec2Block.Body()
-						ec2Body.SetAttributeTraversal(AMI, hcl.Traversal{
-							hcl.TraverseRoot{
-								Name: "var",
-							},
-							hcl.TraverseAttr{
-								Name: varFullPrefix + "ami",
-							},
-						})
-						ec2Body.SetAttributeTraversal(INSTANCE_TYPE, hcl.Traversal{
-							hcl.TraverseRoot{
-								Name: "var",
-							},
-							hcl.TraverseAttr{
-								Name: varFullPrefix + "instance_type",
-							},
-						})
-						ec2Body.SetAttributeValue(AVAILABILITY_ZONE,
-							cty.StringVal(*instance.Placement.AvailabilityZone))
-						if instance.IamInstanceProfile != nil && instance.IamInstanceProfile.Arn != nil {
-							roleName := strings.SplitN(*instance.IamInstanceProfile.Arn, ":instance-profile/", 2)[1]
-							if "duploservices-"+config.TenantName == roleName {
-								ec2Body.SetAttributeTraversal(IAM_INSTANCE_PROFILE, hcl.Traversal{
-									hcl.TraverseRoot{
-										Name: AWS_IAM_ROLE + "." + TENANT_IAM,
-									},
-									hcl.TraverseAttr{
-										Name: "name",
-									},
-								})
-							} else {
-								ec2Body.SetAttributeValue(IAM_INSTANCE_PROFILE,
-									cty.StringVal(roleName))
-							}
-						}
-
-						ec2Body.SetAttributeValue(AVAILABILITY_ZONE,
-							cty.StringVal(*instance.Placement.AvailabilityZone))
-
-						if len(instance.SecurityGroups) > 0 {
-							var vals []cty.Value
-							for _, s := range instance.SecurityGroups {
-								vals = append(vals, cty.StringVal(*s.GroupId))
-							}
-							ec2Body.SetAttributeValue(VPC_SECURITY_GROUP_IDS,
-								cty.ListVal(vals))
-						}
-
-						if instance.SubnetId != nil {
-							ec2Body.SetAttributeValue(SUBNET_ID,
-								cty.StringVal(*instance.SubnetId))
-						}
-						if instance.KeyName != nil {
-							if "duploservices-"+config.TenantName == *instance.KeyName {
-								ec2Body.SetAttributeTraversal(KEY_NAME, hcl.Traversal{
-									hcl.TraverseRoot{
-										Name: "aws_key_pair.tenant_keypair",
-									},
-									hcl.TraverseAttr{
-										Name: "key_name",
-									},
-								})
-							} else {
-								ec2Body.SetAttributeValue(KEY_NAME,
-									cty.StringVal(*instance.KeyName))
-							}
-						}
-						if instance.EbsOptimized != nil && *instance.EbsOptimized {
-							ec2Body.SetAttributeValue(EBS_OPTIMIZED,
-								cty.BoolVal(*instance.EbsOptimized))
-						}
-
-						if len(instance.Tags) > 0 {
-							newMap := make(map[string]cty.Value)
-							for _, tag := range instance.Tags {
-								newMap[*tag.Key] = cty.StringVal(*tag.Value)
-							}
-							ec2Body.SetAttributeValue(TAGS, cty.MapVal(newMap))
-						}
-
-						instanceAttributeOutput, err := ec2Client.DescribeInstanceAttribute(context.TODO(), &ec2.DescribeInstanceAttributeInput{
-							Attribute: types.InstanceAttributeNameUserData, InstanceId: instance.InstanceId,
-						})
-						if err != nil {
-							fmt.Println(err)
-						}
-						if instanceAttributeOutput != nil && instanceAttributeOutput.UserData != nil && instanceAttributeOutput.UserData.Value != nil {
-							// data, err := base64.StdEncoding.DecodeString(*instanceAttributeOutput.UserData.Value)
-							// if err != nil {
-							// 	log.Fatal("error:", err)
-							// }
-							ec2Body.SetAttributeValue(USER_DATA_BASE64,
-								cty.StringVal(*instanceAttributeOutput.UserData.Value))
-						}
-
-						// Add aws_ebs_volume
-						if len(instance.BlockDeviceMappings) > 0 {
-							volIds := []string{}
-							volIdDevice := map[string]string{}
-							for _, ebs := range instance.BlockDeviceMappings {
-								volIds = append(volIds, *ebs.Ebs.VolumeId)
-								volIdDevice[*ebs.Ebs.VolumeId] = *ebs.DeviceName
-							}
-							volumesOutput, err := ec2Client.DescribeVolumes(context.TODO(), &ec2.DescribeVolumesInput{VolumeIds: volIds})
+							path := filepath.Join(workingDir, EC2_FILE_NAME_PREFIX+shortName+".tf")
+							tfFile, err := os.Create(path)
 							if err != nil {
 								fmt.Println(err)
 								return nil, err
 							}
-							if volumesOutput != nil && len(volumesOutput.Volumes) > 0 {
-								for _, vol := range volumesOutput.Volumes {
-									rootBody.AppendNewline()
-									ebsVolBlock := rootBody.AppendNewBlock("resource",
-										[]string{AWS_EBS_VOLUME,
-											resourceName + "_ebs_vol"})
-									ebsVolBody := ebsVolBlock.Body()
-									ebsVolBody.SetAttributeValue(AVAILABILITY_ZONE,
-										cty.StringVal(*vol.AvailabilityZone))
-									if vol.Encrypted != nil {
-										ebsVolBody.SetAttributeValue(ENCRYPTED,
-											cty.BoolVal(*vol.Encrypted))
-									}
-									if vol.Iops != nil {
-										ebsVolBody.SetAttributeValue(IOPS,
-											cty.NumberIntVal(int64(*vol.Iops)))
-									}
-									if vol.SnapshotId != nil {
-										ebsVolBody.SetAttributeValue(SNAPSHOT_ID,
-											cty.StringVal(*vol.SnapshotId))
-									}
-									if vol.Size != nil {
-										ebsVolBody.SetAttributeValue(SIZE,
-											cty.NumberIntVal(int64(*vol.Size)))
-									}
-									if len(vol.VolumeType) > 0 {
-										ebsVolBody.SetAttributeValue(TYPE,
-											cty.StringVal(string(vol.VolumeType)))
-									}
-									if vol.KmsKeyId != nil {
-										ebsVolBody.SetAttributeValue(KMS_KEY_ID,
-											cty.StringVal(*vol.KmsKeyId))
-									}
-									if vol.Throughput != nil {
-										ebsVolBody.SetAttributeValue(THROUGHPUT,
-											cty.NumberIntVal(int64(*vol.Throughput)))
-									}
-									if len(vol.Tags) > 0 {
-										newMap := make(map[string]cty.Value)
-										for _, tag := range vol.Tags {
-											newMap[*tag.Key] = cty.StringVal(*tag.Value)
-										}
-										ebsVolBody.SetAttributeValue(TAGS, cty.MapVal(newMap))
-									}
+							// initialize the body of the new file object
+							rootBody := hclFile.Body()
 
-									if config.GenerateTfState {
-										importConfigs = append(importConfigs, common.ImportConfig{
-											ResourceAddress: strings.Join([]string{
-												AWS_EBS_VOLUME,
-												resourceName + "_ebs_vol",
-											}, "."),
-											ResourceId: *vol.VolumeId,
-											WorkingDir: workingDir,
-										})
-										tfContext.ImportConfigs = importConfigs
-									}
-									rootBody.AppendNewline()
-									ebsVolAttachBlock := rootBody.AppendNewBlock("resource",
-										[]string{AWS_VOLUME_ATTACHMENT,
-											resourceName + "_ebs_vol_attach"})
-									ebsVolAttachBody := ebsVolAttachBlock.Body()
-									ebsVolAttachBody.SetAttributeValue(DEVICE_NAME,
-										cty.StringVal(volIdDevice[*vol.VolumeId]))
-
-									ebsVolAttachBody.SetAttributeTraversal(VOLUME_ID, hcl.Traversal{
+							// Add aws_instance resource
+							ec2Block := rootBody.AppendNewBlock("resource",
+								[]string{AWS_INSTANCE,
+									resourceName})
+							ec2Body := ec2Block.Body()
+							ec2Body.SetAttributeTraversal(AMI, hcl.Traversal{
+								hcl.TraverseRoot{
+									Name: "var",
+								},
+								hcl.TraverseAttr{
+									Name: varFullPrefix + "ami",
+								},
+							})
+							ec2Body.SetAttributeTraversal(INSTANCE_TYPE, hcl.Traversal{
+								hcl.TraverseRoot{
+									Name: "var",
+								},
+								hcl.TraverseAttr{
+									Name: varFullPrefix + "instance_type",
+								},
+							})
+							ec2Body.SetAttributeValue(AVAILABILITY_ZONE,
+								cty.StringVal(*instance.Placement.AvailabilityZone))
+							if instance.IamInstanceProfile != nil && instance.IamInstanceProfile.Arn != nil {
+								roleName := strings.SplitN(*instance.IamInstanceProfile.Arn, ":instance-profile/", 2)[1]
+								if "duploservices-"+config.TenantName == roleName {
+									ec2Body.SetAttributeTraversal(IAM_INSTANCE_PROFILE, hcl.Traversal{
 										hcl.TraverseRoot{
-											Name: AWS_EBS_VOLUME + "." + resourceName + "_ebs_vol",
+											Name: AWS_IAM_ROLE + "." + TENANT_IAM,
 										},
 										hcl.TraverseAttr{
-											Name: "id",
+											Name: "name",
 										},
 									})
-									ebsVolAttachBody.SetAttributeTraversal(INSTANCE_ID, hcl.Traversal{
-										hcl.TraverseRoot{
-											Name: AWS_INSTANCE + "." + resourceName,
-										},
-										hcl.TraverseAttr{
-											Name: "id",
-										},
-									})
-
-									if config.GenerateTfState {
-										importConfigs = append(importConfigs, common.ImportConfig{
-											ResourceAddress: strings.Join([]string{
-												AWS_VOLUME_ATTACHMENT,
-												resourceName + "_ebs_vol_attach",
-											}, "."),
-											ResourceId: strings.Join([]string{
-												volIdDevice[*vol.VolumeId],
-												*vol.VolumeId,
-												*instance.InstanceId,
-											}, ":"),
-											WorkingDir: workingDir,
-										})
-										tfContext.ImportConfigs = importConfigs
-									}
-									break
+								} else {
+									ec2Body.SetAttributeValue(IAM_INSTANCE_PROFILE,
+										cty.StringVal(roleName))
 								}
 							}
-						}
-						_, err = tfFile.Write(hclFile.Bytes())
-						if err != nil {
-							fmt.Println(err)
-							return nil, err
-						}
-						log.Printf("[TRACE] Terraform config is generated for ec2 instance : %s", shortName)
 
-						outVars := generateEC2InstanceOutputVars(varFullPrefix, resourceName)
-						tfContext.OutputVars = append(tfContext.OutputVars, outVars...)
+							ec2Body.SetAttributeValue(AVAILABILITY_ZONE,
+								cty.StringVal(*instance.Placement.AvailabilityZone))
 
-						// Import all created resources.
-						if config.GenerateTfState {
-							importConfigs = append(importConfigs, common.ImportConfig{
-								ResourceAddress: strings.Join([]string{
-									AWS_INSTANCE,
-									resourceName,
-								}, "."),
-								ResourceId: *instance.InstanceId,
-								WorkingDir: workingDir,
+							if len(instance.SecurityGroups) > 0 {
+								var vals []cty.Value
+								for _, s := range instance.SecurityGroups {
+									vals = append(vals, cty.StringVal(*s.GroupId))
+								}
+								ec2Body.SetAttributeValue(VPC_SECURITY_GROUP_IDS,
+									cty.ListVal(vals))
+							}
+
+							if instance.SubnetId != nil {
+								ec2Body.SetAttributeValue(SUBNET_ID,
+									cty.StringVal(*instance.SubnetId))
+							}
+							if instance.KeyName != nil {
+								if "duploservices-"+config.TenantName == *instance.KeyName {
+									ec2Body.SetAttributeTraversal(KEY_NAME, hcl.Traversal{
+										hcl.TraverseRoot{
+											Name: AWS_KEY_PAIR + ".tenant_keypair",
+										},
+										hcl.TraverseAttr{
+											Name: "key_name",
+										},
+									})
+								} else {
+									ec2Body.SetAttributeValue(KEY_NAME,
+										cty.StringVal(*instance.KeyName))
+								}
+							}
+							if instance.EbsOptimized != nil && *instance.EbsOptimized {
+								ec2Body.SetAttributeValue(EBS_OPTIMIZED,
+									cty.BoolVal(*instance.EbsOptimized))
+							}
+
+							if len(instance.Tags) > 0 {
+								newMap := make(map[string]cty.Value)
+								for _, tag := range instance.Tags {
+									//tagValue := strings.Replace(*tag.Value, config.TenantName, "${local.tenant_name}", -1)
+									newMap[*tag.Key] = cty.StringVal(*tag.Value)
+								}
+								ec2Body.SetAttributeValue(TAGS, cty.MapVal(newMap))
+							}
+
+							instanceAttributeOutput, err := ec2Client.DescribeInstanceAttribute(context.TODO(), &ec2.DescribeInstanceAttributeInput{
+								Attribute: types.InstanceAttributeNameUserData, InstanceId: instance.InstanceId,
 							})
-							tfContext.ImportConfigs = importConfigs
+							if err != nil {
+								fmt.Println(err)
+							}
+							if instanceAttributeOutput != nil && instanceAttributeOutput.UserData != nil && instanceAttributeOutput.UserData.Value != nil {
+								// data, err := base64.StdEncoding.DecodeString(*instanceAttributeOutput.UserData.Value)
+								// if err != nil {
+								// 	log.Fatal("error:", err)
+								// }
+								ec2Body.SetAttributeValue(USER_DATA_BASE64,
+									cty.StringVal(*instanceAttributeOutput.UserData.Value))
+							}
+
+							// Add aws_ebs_volume
+							if len(instance.BlockDeviceMappings) > 0 {
+								volIds := []string{}
+								volIdDevice := map[string]string{}
+								for _, ebs := range instance.BlockDeviceMappings {
+									volIds = append(volIds, *ebs.Ebs.VolumeId)
+									volIdDevice[*ebs.Ebs.VolumeId] = *ebs.DeviceName
+								}
+								volumesOutput, err := ec2Client.DescribeVolumes(context.TODO(), &ec2.DescribeVolumesInput{VolumeIds: volIds})
+								if err != nil {
+									fmt.Println(err)
+									return nil, err
+								}
+								if volumesOutput != nil && len(volumesOutput.Volumes) > 0 {
+									for _, vol := range volumesOutput.Volumes {
+										rootBody.AppendNewline()
+										ebsVolBlock := rootBody.AppendNewBlock("resource",
+											[]string{AWS_EBS_VOLUME,
+												resourceName + "_ebs_vol"})
+										ebsVolBody := ebsVolBlock.Body()
+										ebsVolBody.SetAttributeValue(AVAILABILITY_ZONE,
+											cty.StringVal(*vol.AvailabilityZone))
+										if vol.Encrypted != nil {
+											ebsVolBody.SetAttributeValue(ENCRYPTED,
+												cty.BoolVal(*vol.Encrypted))
+										}
+										if vol.Iops != nil {
+											ebsVolBody.SetAttributeValue(IOPS,
+												cty.NumberIntVal(int64(*vol.Iops)))
+										}
+										if vol.SnapshotId != nil {
+											ebsVolBody.SetAttributeValue(SNAPSHOT_ID,
+												cty.StringVal(*vol.SnapshotId))
+										}
+										if vol.Size != nil {
+											ebsVolBody.SetAttributeValue(SIZE,
+												cty.NumberIntVal(int64(*vol.Size)))
+										}
+										if len(vol.VolumeType) > 0 {
+											ebsVolBody.SetAttributeValue(TYPE,
+												cty.StringVal(string(vol.VolumeType)))
+										}
+										if vol.KmsKeyId != nil {
+											ebsVolBody.SetAttributeValue(KMS_KEY_ID,
+												cty.StringVal(*vol.KmsKeyId))
+										}
+										if vol.Throughput != nil {
+											ebsVolBody.SetAttributeValue(THROUGHPUT,
+												cty.NumberIntVal(int64(*vol.Throughput)))
+										}
+										if len(vol.Tags) > 0 {
+											newMap := make(map[string]cty.Value)
+											for _, tag := range vol.Tags {
+												//tagValue := strings.Replace(*tag.Value, config.TenantName, "${local.tenant_name}", -1)
+												newMap[*tag.Key] = cty.StringVal(*tag.Value)
+											}
+											ebsVolBody.SetAttributeValue(TAGS, cty.MapVal(newMap))
+										}
+
+										if config.GenerateTfState {
+											importConfigs = append(importConfigs, common.ImportConfig{
+												ResourceAddress: strings.Join([]string{
+													AWS_EBS_VOLUME,
+													resourceName + "_ebs_vol",
+												}, "."),
+												ResourceId: *vol.VolumeId,
+												WorkingDir: workingDir,
+											})
+											tfContext.ImportConfigs = importConfigs
+										}
+										rootBody.AppendNewline()
+										ebsVolAttachBlock := rootBody.AppendNewBlock("resource",
+											[]string{AWS_VOLUME_ATTACHMENT,
+												resourceName + "_ebs_vol_attach"})
+										ebsVolAttachBody := ebsVolAttachBlock.Body()
+										ebsVolAttachBody.SetAttributeValue(DEVICE_NAME,
+											cty.StringVal(volIdDevice[*vol.VolumeId]))
+
+										ebsVolAttachBody.SetAttributeTraversal(VOLUME_ID, hcl.Traversal{
+											hcl.TraverseRoot{
+												Name: AWS_EBS_VOLUME + "." + resourceName + "_ebs_vol",
+											},
+											hcl.TraverseAttr{
+												Name: "id",
+											},
+										})
+										ebsVolAttachBody.SetAttributeTraversal(INSTANCE_ID, hcl.Traversal{
+											hcl.TraverseRoot{
+												Name: AWS_INSTANCE + "." + resourceName,
+											},
+											hcl.TraverseAttr{
+												Name: "id",
+											},
+										})
+
+										if config.GenerateTfState {
+											importConfigs = append(importConfigs, common.ImportConfig{
+												ResourceAddress: strings.Join([]string{
+													AWS_VOLUME_ATTACHMENT,
+													resourceName + "_ebs_vol_attach",
+												}, "."),
+												ResourceId: strings.Join([]string{
+													volIdDevice[*vol.VolumeId],
+													*vol.VolumeId,
+													*instance.InstanceId,
+												}, ":"),
+												WorkingDir: workingDir,
+											})
+											tfContext.ImportConfigs = importConfigs
+										}
+										break
+									}
+								}
+							}
+							_, err = tfFile.Write(hclFile.Bytes())
+							if err != nil {
+								fmt.Println(err)
+								return nil, err
+							}
+							log.Printf("[TRACE] Terraform config is generated for ec2 instance : %s", shortName)
+
+							outVars := generateEC2InstanceOutputVars(varFullPrefix, resourceName)
+							tfContext.OutputVars = append(tfContext.OutputVars, outVars...)
+
+							lifecycleBlock := ec2Body.AppendNewBlock("lifecycle", nil)
+							lifecycleBody := lifecycleBlock.Body()
+							ignoreChanges := "user_data,user_data_base64"
+							ignoreChangesTokens := hclwrite.Tokens{
+								{Type: hclsyntax.TokenOQuote, Bytes: []byte(`[`)},
+								{Type: hclsyntax.TokenIdent, Bytes: []byte(ignoreChanges)},
+								{Type: hclsyntax.TokenCQuote, Bytes: []byte(`]`)},
+							}
+							lifecycleBody.SetAttributeRaw("ignore_changes", ignoreChangesTokens)
+							// Import all created resources.
+							if config.GenerateTfState {
+								importConfigs = append(importConfigs, common.ImportConfig{
+									ResourceAddress: strings.Join([]string{
+										AWS_INSTANCE,
+										resourceName,
+									}, "."),
+									ResourceId: *instance.InstanceId,
+									WorkingDir: workingDir,
+								})
+								tfContext.ImportConfigs = importConfigs
+							}
 						}
 					}
 				}
 			}
+			log.Println("[TRACE] <====== EC2 instance TF generation done. =====>")
 		}
-
-		log.Println("[TRACE] <====== EC2 instance TF generation done. =====>")
 	}
 	return &tfContext, nil
 }
