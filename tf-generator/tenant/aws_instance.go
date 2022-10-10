@@ -43,6 +43,7 @@ const (
 	DEVICE_NAME                 string = "device_name"
 	VOLUME_ID                   string = "volume_id"
 	INSTANCE_ID                 string = "instance_id"
+	HIBERNATION                 string = "hibernation"
 )
 
 const AWS_INSTANCE = "aws_instance"
@@ -158,6 +159,10 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 							ec2Body.SetAttributeValue(AVAILABILITY_ZONE,
 								cty.StringVal(*instance.Placement.AvailabilityZone))
 
+							if instance.HibernationOptions != nil && instance.HibernationOptions.Configured != nil {
+								ec2Body.SetAttributeValue(HIBERNATION,
+									cty.BoolVal(*instance.HibernationOptions.Configured))
+							}
 							if len(instance.SecurityGroups) > 0 {
 								var vals []cty.Value
 								for _, s := range instance.SecurityGroups {
@@ -197,6 +202,9 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 									{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
 								}
 								for _, tag := range instance.Tags {
+									if common.IsTagAwsManaged(*tag.Key) {
+										continue
+									}
 									tagValue := strings.Replace(*tag.Value, config.TenantName, "${local.tenant_name}", -1)
 									tag := "\"" + *tag.Key + "\"" + " = \"" + tagValue + "\"\n"
 									tagsTokens = append(tagsTokens,
@@ -338,7 +346,7 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 							}
 							lifecycleBlock := ec2Body.AppendNewBlock("lifecycle", nil)
 							lifecycleBody := lifecycleBlock.Body()
-							ignoreChanges := "user_data,user_data_base64"
+							ignoreChanges := "user_data,user_data_base64,user_data_replace_on_change"
 							ignoreChangesTokens := hclwrite.Tokens{
 								{Type: hclsyntax.TokenOQuote, Bytes: []byte(`[`)},
 								{Type: hclsyntax.TokenIdent, Bytes: []byte(ignoreChanges)},

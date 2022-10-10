@@ -133,3 +133,7 @@ func ValidateAndFormatTfCode(tfDir, tfVersion string) {
 	log.Printf("[TRACE] Formatting of terraform code generated at %s is done.", tfDir)
 	log.Printf("[TRACE] Validation and formatting of terraform code generated at %s is done.", tfDir)
 }
+
+func IsTagAwsManaged(tagKey string) bool {
+	return strings.HasPrefix(tagKey, "aws:")
+}

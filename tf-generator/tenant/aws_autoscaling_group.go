@@ -158,6 +158,9 @@ func (awsASG *AwsASG) Generate(config *common.Config, client *duplosdk.Client) (
 				if len(asgGroup.Tags) > 0 {
 					for _, tag := range asgGroup.Tags {
 						//tagValue := strings.Replace(*tag.Value, config.TenantName, "${local.tenant_name}", -1)
+						if common.IsTagAwsManaged(*tag.Key) {
+							continue
+						}
 						tagBlock := asgBody.AppendNewBlock(TAG,
 							nil)
 						tagBody := tagBlock.Body()

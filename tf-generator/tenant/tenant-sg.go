@@ -72,6 +72,13 @@ func (tenantSG *TenantSG) Generate(config *common.Config, client *duplosdk.Clien
 			fmt.Println(err)
 			return nil, err
 		}
+		// b, err := json.Marshal(describeSecurityGroupsOutput)
+		// if err != nil {
+		// 	fmt.Println(err)
+		// }
+		// fmt.Println("||==================================================================||")
+		// fmt.Println(string(b))
+		// fmt.Println("||==================================================================||")
 		rootBody := hclFile.Body()
 		for _, sg := range describeSecurityGroupsOutput.SecurityGroups {
 			log.Printf("[TRACE] Terraform config generation started for aws security group (%s).", *sg.GroupName)
@@ -176,11 +183,19 @@ func (tenantSG *TenantSG) Generate(config *common.Config, client *duplosdk.Clien
 					if len(ingress.UserIdGroupPairs) > 0 {
 						var vals []cty.Value
 						sgid := ""
+						desc := ""
 						for _, s := range ingress.UserIdGroupPairs {
 							vals = append(vals, cty.StringVal(*s.GroupId))
 							sgid = *s.GroupId
+							if s.Description != nil {
+								desc = *s.Description
+							}
 						}
 
+						if len(desc) > 0 {
+							ingressBody.SetAttributeValue(SG_DESCRIPTION,
+								cty.StringVal(desc))
+						}
 						if len(vals) == 1 && sgid == *sg.GroupId {
 							ingressBody.SetAttributeValue(SG_SELF,
 								cty.BoolVal(true))
@@ -262,6 +277,9 @@ func (tenantSG *TenantSG) Generate(config *common.Config, client *duplosdk.Clien
 			if len(sg.Tags) > 0 {
 				newMap := make(map[string]cty.Value)
 				for _, tag := range sg.Tags {
+					if common.IsTagAwsManaged(*tag.Key) {
+						continue
+					}
 					newMap[*tag.Key] = cty.StringVal(*tag.Value)
 				}
 				sgBody.SetAttributeValue(TAGS, cty.MapVal(newMap))
