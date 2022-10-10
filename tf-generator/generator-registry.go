@@ -13,4 +13,5 @@ var TenantGenerators = []Generator{
 	&tenant.TenantSG{},
 	&tenant.AwsInstance{},
 	&tenant.AwsASG{},
+	&tenant.AwsElasticacheCluster{},
 }
