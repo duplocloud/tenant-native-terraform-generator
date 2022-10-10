@@ -112,7 +112,7 @@ func (tenantSG *TenantSG) Generate(config *common.Config, client *duplosdk.Clien
 					},
 				})
 			}
-			if sg.Description != nil {
+			if sg.Description != nil && len(*sg.Description) > 0 {
 				// desc := *sg.Description
 				// desc = strings.Replace(desc, config.TenantName, "${local.tenant_name}", -1)
 				sgBody.SetAttributeValue(SG_DESCRIPTION,

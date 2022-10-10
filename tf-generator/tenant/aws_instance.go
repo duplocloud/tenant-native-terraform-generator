@@ -336,6 +336,15 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 									}
 								}
 							}
+							lifecycleBlock := ec2Body.AppendNewBlock("lifecycle", nil)
+							lifecycleBody := lifecycleBlock.Body()
+							ignoreChanges := "user_data,user_data_base64"
+							ignoreChangesTokens := hclwrite.Tokens{
+								{Type: hclsyntax.TokenOQuote, Bytes: []byte(`[`)},
+								{Type: hclsyntax.TokenIdent, Bytes: []byte(ignoreChanges)},
+								{Type: hclsyntax.TokenCQuote, Bytes: []byte(`]`)},
+							}
+							lifecycleBody.SetAttributeRaw("ignore_changes", ignoreChangesTokens)
 							_, err = tfFile.Write(hclFile.Bytes())
 							if err != nil {
 								fmt.Println(err)
@@ -346,15 +355,6 @@ func (ec2Instance *AwsInstance) Generate(config *common.Config, client *duplosdk
 							outVars := generateEC2InstanceOutputVars(varFullPrefix, resourceName)
 							tfContext.OutputVars = append(tfContext.OutputVars, outVars...)
 
-							lifecycleBlock := ec2Body.AppendNewBlock("lifecycle", nil)
-							lifecycleBody := lifecycleBlock.Body()
-							ignoreChanges := "user_data,user_data_base64"
-							ignoreChangesTokens := hclwrite.Tokens{
-								{Type: hclsyntax.TokenOQuote, Bytes: []byte(`[`)},
-								{Type: hclsyntax.TokenIdent, Bytes: []byte(ignoreChanges)},
-								{Type: hclsyntax.TokenCQuote, Bytes: []byte(`]`)},
-							}
-							lifecycleBody.SetAttributeRaw("ignore_changes", ignoreChangesTokens)
 							// Import all created resources.
 							if config.GenerateTfState {
 								importConfigs = append(importConfigs, common.ImportConfig{

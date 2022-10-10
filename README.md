@@ -15,7 +15,6 @@ This utility provides a way to export the terraform code that represents the inf
 # Required Vars
 export customer_name="duplo-masp"
 export tenant_name="test"
-export cert_arn="arn:aws:acm:us-west-2:128329325849:certificate/1234567890-aaaa-bbbb-ccc-66e7dcd609e1"
 export duplo_host="https://msp.duplocloud.net"
 export duplo_token="xxx-xxxxx-xxxxxxxx"
 export AWS_PROFILE="AWS_PROFILE"
@@ -24,7 +23,7 @@ You can optionally pass following environment variables.
 
 ```shell
 # Optional Vars
-export tenant_project="admin-tenant" # Project name for tenant, Default is admin-tenant.
+export tenant_project="tenant" # Project name for tenant, Default is tenant.
 export tf_version=0.14.11  # Terraform version to be used, Default is 0.14.11.
 export validate_tf="false" # Whether to validate generated tf code, Default is true.
 export s3_backend="true"   # Whether to use s3 backend or not, Default is false.
@@ -55,4 +54,4 @@ export generate_tf_state="false" # Whether to import generated tf resources, Def
     │          ├── tenant        # Terraform code for tenant and tenant related resources.
     ```
 
-  - **Project : tenant** This projects manages creation of DuploCloud tenant and tenant related resources.
+  - **Project : tenant** This projects manages creation of AWS resources which are created from DuploCloud.
