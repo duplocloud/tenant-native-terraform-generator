@@ -54,6 +54,13 @@ func (tenantKMS *TenantKMS) Generate(config *common.Config, client *duplosdk.Cli
 		fmt.Println(err)
 		return nil, err
 	}
+	b, err := json.Marshal(describeKeyOutput)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("||==================================================================||")
+	fmt.Println(string(b))
+	fmt.Println("||==================================================================||")
 	defaultPolicy := "default"
 	getKeyPolicyOutput, err := kmsClient.GetKeyPolicy(context.TODO(), &kms.GetKeyPolicyInput{KeyId: &duplo.KeyID, PolicyName: &defaultPolicy})
 	if err != nil {
@@ -94,9 +101,22 @@ func (tenantKMS *TenantKMS) Generate(config *common.Config, client *duplosdk.Cli
 			kmsBody.SetAttributeValue(KMS_CUSTOMER_MASTER_KEY_SPEC,
 				cty.StringVal(string(describeKeyOutput.KeyMetadata.KeySpec)))
 		}
-		kmsBody.SetAttributeValue(KMS_ENABLE_KEY_ROTATION,
-			cty.BoolVal(true))
-
+		keyRotationStatus, err := kmsClient.GetKeyRotationStatus(context.TODO(), &kms.GetKeyRotationStatusInput{KeyId: describeKeyOutput.KeyMetadata.KeyId})
+		if err != nil {
+			fmt.Println(err)
+			return nil, err
+		}
+		// b, err := json.Marshal(keyRotationStatus)
+		// if err != nil {
+		// 	fmt.Println(err)
+		// }
+		// fmt.Println("||==================================================================||")
+		// fmt.Println(string(b))
+		// fmt.Println("||==================================================================||")
+		if keyRotationStatus != nil {
+			kmsBody.SetAttributeValue(KMS_ENABLE_KEY_ROTATION,
+				cty.BoolVal(keyRotationStatus.KeyRotationEnabled))
+		}
 		if getKeyPolicyOutput != nil && getKeyPolicyOutput.Policy != nil {
 			iamClient := iam.NewFromConfig(config.AwsClientConfig)
 			iamRoleName := "duploservices-" + config.TenantName

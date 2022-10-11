@@ -157,20 +157,37 @@ func (tenantSG *TenantSG) Generate(config *common.Config, client *duplosdk.Clien
 						cty.StringVal(*ingress.IpProtocol))
 
 					if len(ingress.IpRanges) > 0 {
+						desc := ""
 						var vals []cty.Value
 						for _, s := range ingress.IpRanges {
+							if s.Description != nil {
+								desc = *s.Description
+							}
 							vals = append(vals, cty.StringVal(*s.CidrIp))
 						}
 						ingressBody.SetAttributeValue(SG_CIDR_BLOCKS,
 							cty.ListVal(vals))
+						if len(desc) > 0 {
+							ingressBody.SetAttributeValue(SG_DESCRIPTION,
+								cty.StringVal(desc))
+						}
+
 					}
 					if len(ingress.Ipv6Ranges) > 0 {
+						desc := ""
 						var vals []cty.Value
 						for _, s := range ingress.Ipv6Ranges {
+							if s.Description != nil {
+								desc = *s.Description
+							}
 							vals = append(vals, cty.StringVal(*s.CidrIpv6))
 						}
 						ingressBody.SetAttributeValue(SG_IPV6_CIDR_BLOCKS,
 							cty.ListVal(vals))
+						if len(desc) > 0 {
+							ingressBody.SetAttributeValue(SG_DESCRIPTION,
+								cty.StringVal(desc))
+						}
 					}
 					if len(ingress.PrefixListIds) > 0 {
 						var vals []cty.Value
