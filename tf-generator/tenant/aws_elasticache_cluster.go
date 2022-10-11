@@ -19,24 +19,26 @@ import (
 )
 
 const (
-	REDIS                      string = "redis"
-	CLUSTER_ID                 string = "cluster_id"
-	ENGINE                     string = "engine"
-	NODE_TYPE                  string = "node_type"
-	NUM_CACHE_NODES            string = "num_cache_nodes"
-	PARAMETER_GROUP_NAME       string = "parameter_group_name"
-	ENGINE_VERSION             string = "engine_version"
-	SUBNET_GROUP_NAME          string = "subnet_group_name"
-	SNAPSHOT_ARNS              string = "snapshot_arns"
-	SECURITY_GROUP_IDS         string = "security_group_ids"
-	AZ_MODE                    string = "az_mode"
-	REPLICATION_GROUP_ID       string = "replication_group_id"
-	DESCRIPTION                string = "description"
-	MULTI_AZ_ENABLED           string = "multi_az_enabled"
-	NUM_CACHE_CLUSTERS         string = "num_cache_clusters"
-	AUTOMATIC_FAILOVER_ENABLED string = "automatic_failover_enabled"
-	AT_REST_ENCRYPTION_ENABLED string = "at_rest_encryption_enabled"
-	TRANSIT_ENCRYPTION_ENABLED string = "transit_encryption_enabled"
+	REDIS                        string = "redis"
+	MEMCACHED                    string = "memcached"
+	CLUSTER_ID                   string = "cluster_id"
+	ENGINE                       string = "engine"
+	NODE_TYPE                    string = "node_type"
+	NUM_CACHE_NODES              string = "num_cache_nodes"
+	PARAMETER_GROUP_NAME         string = "parameter_group_name"
+	ENGINE_VERSION               string = "engine_version"
+	SUBNET_GROUP_NAME            string = "subnet_group_name"
+	SNAPSHOT_ARNS                string = "snapshot_arns"
+	SECURITY_GROUP_IDS           string = "security_group_ids"
+	AZ_MODE                      string = "az_mode"
+	REPLICATION_GROUP_ID         string = "replication_group_id"
+	DESCRIPTION                  string = "description"
+	MULTI_AZ_ENABLED             string = "multi_az_enabled"
+	NUM_CACHE_CLUSTERS           string = "num_cache_clusters"
+	AUTOMATIC_FAILOVER_ENABLED   string = "automatic_failover_enabled"
+	AT_REST_ENCRYPTION_ENABLED   string = "at_rest_encryption_enabled"
+	TRANSIT_ENCRYPTION_ENABLED   string = "transit_encryption_enabled"
+	PREFERRED_AVAILABILITY_ZONES string = "preferred_availability_zones"
 )
 
 const AWS_ELASTICACHE_REPLICATION_GROUP = "aws_elasticache_replication_group"
@@ -220,6 +222,104 @@ func (awsElasticacheCluster *AwsElasticacheCluster) Generate(config *common.Conf
 					fmt.Println("||==================================================================||")
 					fmt.Println(string(b))
 					fmt.Println("||==================================================================||")
+					for _, memcached := range cacheClusters.CacheClusters {
+						shortName := cluster.Identifier[len("duplo-"):len(cluster.Identifier)]
+						resourceName := common.GetResourceName(shortName)
+
+						hclFile := hclwrite.NewEmptyFile()
+
+						path := filepath.Join(workingDir, ELASTICACHE_FILE_NAME_PREFIX+shortName+".tf")
+						tfFile, err := os.Create(path)
+						if err != nil {
+							fmt.Println(err)
+							return nil, err
+						}
+						rootBody := hclFile.Body()
+						ecacheBlock := rootBody.AppendNewBlock("resource",
+							[]string{AWS_ELASTICACHE_CLUSTER,
+								resourceName})
+						ecacheBody := ecacheBlock.Body()
+						ecacheBody.SetAttributeValue(CLUSTER_ID,
+							cty.StringVal(*memcached.CacheClusterId))
+						ecacheBody.SetAttributeValue(ENGINE,
+							cty.StringVal(MEMCACHED))
+						if memcached.CacheNodeType != nil {
+							ecacheBody.SetAttributeValue(NODE_TYPE,
+								cty.StringVal(*memcached.CacheNodeType))
+						}
+						if memcached.NumCacheNodes != nil {
+							ecacheBody.SetAttributeValue(NUM_CACHE_NODES,
+								cty.NumberIntVal(int64(*memcached.NumCacheNodes)))
+						}
+						if memcached.CacheParameterGroup != nil {
+							ecacheBody.SetAttributeValue(PARAMETER_GROUP_NAME,
+								cty.StringVal(*memcached.CacheParameterGroup.CacheParameterGroupName))
+						}
+						if memcached.AtRestEncryptionEnabled != nil && *memcached.AtRestEncryptionEnabled {
+							ecacheBody.SetAttributeValue(AT_REST_ENCRYPTION_ENABLED,
+								cty.BoolVal(true))
+						}
+						if memcached.TransitEncryptionEnabled != nil && *memcached.TransitEncryptionEnabled {
+							ecacheBody.SetAttributeValue(TRANSIT_ENCRYPTION_ENABLED,
+								cty.BoolVal(true))
+						}
+						if memcached.CacheSubnetGroupName != nil {
+							ecacheBody.SetAttributeValue(SUBNET_GROUP_NAME,
+								cty.StringVal(*memcached.CacheSubnetGroupName))
+						}
+						// if memcached.PreferredAvailabilityZone != nil {
+						// 	ecacheBody.SetAttributeValue(PREFERRED_AVAILABILITY_ZONES,
+						// 		cty.ListVal([]cty.Value{cty.StringVal(*memcached.PreferredAvailabilityZone)}))
+						// }
+						if len(memcached.SecurityGroups) > 0 {
+							var vals []cty.Value
+							for _, s := range memcached.SecurityGroups {
+								vals = append(vals, cty.StringVal(*s.SecurityGroupId))
+							}
+							ecacheBody.SetAttributeValue(SECURITY_GROUP_IDS,
+								cty.ListVal(vals))
+						}
+						tagsOutput, err := elasticacheClient.ListTagsForResource(context.TODO(), &elasticache.ListTagsForResourceInput{
+							ResourceName: memcached.ARN,
+						})
+						if err != nil {
+							fmt.Println(err)
+							return nil, err
+						}
+						if tagsOutput != nil {
+							if len(tagsOutput.TagList) > 0 {
+								tagsTokens := hclwrite.Tokens{
+									{Type: hclsyntax.TokenOQuote, Bytes: []byte(`{`)},
+									{Type: hclsyntax.TokenNewline, Bytes: []byte("\n")},
+								}
+								for _, tag := range tagsOutput.TagList {
+									tagValue := strings.Replace(*tag.Value, config.TenantName, "${local.tenant_name}", -1)
+									tag := "\"" + *tag.Key + "\"" + " = \"" + tagValue + "\"\n"
+									tagsTokens = append(tagsTokens,
+										&hclwrite.Token{Type: hclsyntax.TokenIdent, Bytes: []byte(tag)},
+									)
+								}
+								tagsTokens = append(tagsTokens, &hclwrite.Token{Type: hclsyntax.TokenCQuote, Bytes: []byte(`}`)})
+								ecacheBody.SetAttributeRaw(TAGS, tagsTokens)
+							}
+						}
+						_, err = tfFile.Write(hclFile.Bytes())
+						if err != nil {
+							fmt.Println(err)
+							return nil, err
+						}
+						if config.GenerateTfState {
+							importConfigs = append(importConfigs, common.ImportConfig{
+								ResourceAddress: strings.Join([]string{
+									AWS_ELASTICACHE_CLUSTER,
+									resourceName,
+								}, "."),
+								ResourceId: *memcached.CacheClusterId,
+								WorkingDir: workingDir,
+							})
+							tfContext.ImportConfigs = importConfigs
+						}
+					}
 				}
 			}
 		}
