@@ -206,11 +206,20 @@ func (awsElasticacheCluster *AwsElasticacheCluster) Generate(config *common.Conf
 					}
 				}
 			} else {
-				_, err := elasticacheClient.DescribeCacheClusters(context.TODO(),
+				cacheClusters, err := elasticacheClient.DescribeCacheClusters(context.TODO(),
 					&elasticache.DescribeCacheClustersInput{CacheClusterId: &cluster.Identifier})
 				if err != nil {
 					fmt.Println(err)
 					return nil, err
+				}
+				if cacheClusters != nil && len(cacheClusters.CacheClusters) > 0 {
+					b, err := json.Marshal(cacheClusters)
+					if err != nil {
+						fmt.Println(err)
+					}
+					fmt.Println("||==================================================================||")
+					fmt.Println(string(b))
+					fmt.Println("||==================================================================||")
 				}
 			}
 		}
