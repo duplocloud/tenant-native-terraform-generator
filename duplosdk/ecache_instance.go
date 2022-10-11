@@ -27,7 +27,7 @@ type DuploEcacheInstance struct {
 
 func (c *Client) EcacheInstanceList(tenantID string) (*[]DuploEcacheInstance, ClientError) {
 	rp := []DuploEcacheInstance{}
-	err := c.getAPI(fmt.Sprintf("RdsInstanceList(%s)", tenantID),
+	err := c.getAPI(fmt.Sprintf("EcacheInstanceList(%s)", tenantID),
 		fmt.Sprintf("subscriptions/%s/GetEcacheInstances", tenantID),
 		&rp)
 	return &rp, err
