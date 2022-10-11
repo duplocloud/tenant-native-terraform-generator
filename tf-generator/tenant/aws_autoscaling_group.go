@@ -2,6 +2,7 @@ package tenant
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -44,6 +45,8 @@ const (
 	HTTP_PUT_RESPONSE_HOP_LIMIT string = "http_put_response_hop_limit"
 	HTTP_TOKENS                 string = "http_tokens"
 	HEALTH_CHECK_GRACE_PERIOD   string = "health_check_grace_period"
+	VOLUME_SIZE                 string = "volume_size"
+	VOLUME_TYPE                 string = "volume_type"
 )
 
 const AWS_AUTOSCALING_GROUP = "aws_autoscaling_group"
@@ -207,6 +210,13 @@ func (awsASG *AwsASG) Generate(config *common.Config, client *duplosdk.Client) (
 						fmt.Println(err)
 						return nil, err
 					}
+					b, err := json.Marshal(launchConfigurationsOutput)
+					if err != nil {
+						fmt.Println(err)
+					}
+					fmt.Println("||==================================================================||")
+					fmt.Println(string(b))
+					fmt.Println("||==================================================================||")
 					for _, lc := range launchConfigurationsOutput.LaunchConfigurations {
 						rootBody.AppendNewline()
 						lcBlock := rootBody.AppendNewBlock("resource",
@@ -317,11 +327,11 @@ func (awsASG *AwsASG) Generate(config *common.Config, client *duplosdk.Client) (
 											cty.StringVal(*ebs.SnapshotId))
 									}
 									if ebs.VolumeSize != nil {
-										bdmBody.SetAttributeValue(SIZE,
+										bdmBody.SetAttributeValue(VOLUME_SIZE,
 											cty.NumberIntVal(int64(*ebs.VolumeSize)))
 									}
 									if ebs.VolumeType != nil {
-										bdmBody.SetAttributeValue(TYPE,
+										bdmBody.SetAttributeValue(VOLUME_TYPE,
 											cty.StringVal(*ebs.VolumeType))
 									}
 									if ebs.Throughput != nil {
@@ -331,6 +341,9 @@ func (awsASG *AwsASG) Generate(config *common.Config, client *duplosdk.Client) (
 									if ebs.DeleteOnTermination != nil {
 										bdmBody.SetAttributeValue(DELETE_ON_TERMINATION,
 											cty.BoolVal(*ebs.DeleteOnTermination))
+									} else {
+										bdmBody.SetAttributeValue(DELETE_ON_TERMINATION,
+											cty.BoolVal(false))
 									}
 								}
 							}
